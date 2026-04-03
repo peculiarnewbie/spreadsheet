@@ -118,3 +118,58 @@ export async function typeIntoCell(
 export async function press(stagehand: Stagehand, key: string) {
 	await stagehand.page.keyboard.press(key);
 }
+
+/** Shift-click a cell to extend the current selection. */
+export async function shiftClickCell(
+	stagehand: Stagehand,
+	row: number,
+	col: number,
+) {
+	await cellLocator(stagehand, row, col).click({ modifiers: ["Shift"] });
+}
+
+/**
+ * Drag the fill handle from its current position to a target cell.
+ *
+ * The fill handle (`.se-fill-handle`) sits at the bottom-right corner of the
+ * primary selection. The grid resolves drag targets from mouse coordinates via
+ * document-level mousemove/mouseup, so we use the low-level mouse API to
+ * simulate the full drag gesture.
+ */
+export async function dragFillHandle(
+	stagehand: Stagehand,
+	targetRow: number,
+	targetCol: number,
+) {
+	const page = stagehand.page;
+	const handle = page.locator(".se-fill-handle");
+
+	// Get fill handle center coordinates
+	const handleBox = await handle.boundingBox();
+	if (!handleBox) throw new Error("Fill handle not visible");
+
+	const handleX = handleBox.x + handleBox.width / 2;
+	const handleY = handleBox.y + handleBox.height / 2;
+
+	// Get target cell center coordinates
+	const target = cellLocator(stagehand, targetRow, targetCol);
+	const targetBox = await target.boundingBox();
+	if (!targetBox) throw new Error(`Target cell (${targetRow}, ${targetCol}) not visible`);
+
+	const targetX = targetBox.x + targetBox.width / 2;
+	const targetY = targetBox.y + targetBox.height / 2;
+
+	// Perform the drag: move to handle → press → drag to target → release
+	await page.mouse.move(handleX, handleY);
+	await page.mouse.down();
+	// Move in a few steps so the grid registers intermediate positions
+	const steps = 5;
+	for (let i = 1; i <= steps; i++) {
+		const t = i / steps;
+		await page.mouse.move(
+			handleX + (targetX - handleX) * t,
+			handleY + (targetY - handleY) * t,
+		);
+	}
+	await page.mouse.up();
+}
