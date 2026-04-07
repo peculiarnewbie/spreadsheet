@@ -378,6 +378,12 @@
 	outline-offset: -1px;
 }
 
+.se-context-menu__separator {
+	height: 1px;
+	margin: 4px 0;
+	background: #444;
+}
+
 .se-context-menu__shortcut {
 	color: #888;
 	font-size: 11px;

@@ -150,6 +150,10 @@ export interface SheetProps {
 	onScroll?: (position: ScrollPosition) => void;
 	onColumnResize?: (columnId: string, width: number) => void;
 	onSort?: (columnId: string, direction: "asc" | "desc") => void;
+	/** Called when rows are inserted. The host should update its data array accordingly. */
+	onRowInsert?: (atIndex: number, count: number) => void;
+	/** Called when rows are deleted. The host should update its data array accordingly. */
+	onRowDelete?: (atIndex: number, count: number) => void;
 
 	/**
 	 * Visual and formula-display customization hooks.
@@ -195,6 +199,10 @@ export interface SheetController {
 	/** Legacy alias for getRawCellValue. */
 	getCellValue(row: number, col: number): CellValue;
 	setCellValue(row: number, col: number, value: CellValue): void;
+	/** Insert empty rows at the given index, shifting existing data down. */
+	insertRows(atIndex: number, count: number): void;
+	/** Delete rows at the given index, shifting existing data up. */
+	deleteRows(atIndex: number, count: number): void;
 	getColumnMeta(columnId: string): Record<string, unknown> | undefined;
 	undo(): void;
 	redo(): void;

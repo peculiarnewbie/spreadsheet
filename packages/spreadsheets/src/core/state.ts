@@ -10,6 +10,8 @@ import type {
 import { emptySelection, selectCell } from "./selection";
 import {
 	type HistoryStack,
+	type RowOperation,
+	type UndoRedoRowChange,
 	canRedo as histCanRedo,
 	canUndo as histCanUndo,
 	createHistory,
@@ -24,6 +26,11 @@ export interface SheetState {
 	cells: CellValue[][];
 	rowCount: number;
 	colCount: number;
+}
+
+export interface UndoRedoResult {
+	mutations: CellMutation[];
+	rowChange?: UndoRedoRowChange;
 }
 
 export interface SheetStore {
@@ -43,11 +50,14 @@ export interface SheetStore {
 	setEditMode(state: EditModeState | null): void;
 	setColumnWidth(columnId: string, width: number): void;
 	resizeGrid(rowCount: number, colCount: number): void;
+	insertRows(atIndex: number, count: number): void;
+	deleteRows(atIndex: number, count: number): CellValue[][];
 
 	// History
 	pushMutations(mutations: CellMutation[], selectionBefore: Selection, selectionAfter: Selection): void;
-	undo(): CellMutation[] | null;
-	redo(): CellMutation[] | null;
+	pushRowOperation(rowOp: RowOperation, selectionBefore: Selection, selectionAfter: Selection): void;
+	undo(): UndoRedoResult | null;
+	redo(): UndoRedoResult | null;
 	canUndo(): boolean;
 	canRedo(): boolean;
 }
@@ -74,6 +84,74 @@ export function createSheetStore(
 		new Map(columns.map((c) => [c.id, c.width ?? 120])),
 	);
 	const [historyState, setHistory] = createSignal<HistoryStack>(createHistory());
+
+	/** Internal: splice empty rows into the cells array and update dimensions. */
+	function _insertRows(atIndex: number, count: number) {
+		const currentRowCount = dimensions().rowCount;
+		const cc = dimensions().colCount;
+		const insertAt = Math.max(0, Math.min(atIndex, currentRowCount));
+
+		setDimensions({ rowCount: currentRowCount + count, colCount: cc });
+		setCells(
+			produce((draft) => {
+				const newRows = Array.from({ length: count }, () =>
+					new Array(cc).fill(null) as CellValue[],
+				);
+				draft.splice(insertAt, 0, ...newRows);
+			}),
+		);
+	}
+
+	/** Internal: splice rows out of the cells array, update dimensions, return removed data. */
+	function _deleteRows(atIndex: number, count: number): CellValue[][] {
+		const currentRowCount = dimensions().rowCount;
+		const cc = dimensions().colCount;
+		const deleteAt = Math.max(0, Math.min(atIndex, currentRowCount));
+		const actualCount = Math.min(count, currentRowCount - deleteAt);
+		if (actualCount <= 0) return [];
+
+		// Capture the data being removed (deep copy)
+		const removedData: CellValue[][] = [];
+		for (let r = deleteAt; r < deleteAt + actualCount; r++) {
+			const row = cells[r];
+			removedData.push(row ? [...row] : new Array(cc).fill(null) as CellValue[]);
+		}
+
+		setDimensions({ rowCount: currentRowCount - actualCount, colCount: cc });
+		setCells(
+			produce((draft) => {
+				draft.splice(deleteAt, actualCount);
+			}),
+		);
+
+		return removedData;
+	}
+
+	/** Internal: insert rows and fill them with given data. */
+	function _insertRowsWithData(atIndex: number, data: CellValue[][]) {
+		_insertRows(atIndex, data.length);
+		// Restore the saved cell data
+		setCells(
+			produce((draft) => {
+				for (let r = 0; r < data.length; r++) {
+					const row = data[r]!;
+					const targetRow = draft[atIndex + r]!;
+					for (let c = 0; c < row.length; c++) {
+						targetRow[c] = row[c] ?? null;
+					}
+				}
+			}),
+		);
+	}
+
+	/** Internal: apply a row operation (used during undo/redo). */
+	function applyRowOp(rowOp: RowOperation) {
+		if (rowOp.type === "insertRows") {
+			_insertRows(rowOp.atIndex, rowOp.count);
+		} else {
+			_deleteRows(rowOp.atIndex, rowOp.count);
+		}
+	}
 
 	return {
 		get cells() {
@@ -156,46 +234,87 @@ export function createSheetStore(
 			);
 		},
 
+		insertRows(atIndex: number, count: number) {
+			_insertRows(atIndex, count);
+		},
+
+		deleteRows(atIndex: number, count: number): CellValue[][] {
+			return _deleteRows(atIndex, count);
+		},
+
 		pushMutations(mutations: CellMutation[], selectionBefore: Selection, selectionAfter: Selection) {
 			setHistory((prev) => pushHistory(prev, mutations, selectionBefore, selectionAfter));
 		},
 
-		undo(): CellMutation[] | null {
+		pushRowOperation(rowOp: RowOperation, selectionBefore: Selection, selectionAfter: Selection) {
+			setHistory((prev) => pushHistory(prev, [], selectionBefore, selectionAfter, rowOp));
+		},
+
+		undo(): UndoRedoResult | null {
 			const result = histUndo(historyState());
 			if (!result) return null;
 			setHistory(result.history);
 			setSelection(result.selection);
-			// Apply inverse mutations
-			setCells(
-				produce((draft) => {
-					for (const m of result.mutations) {
-						const row = draft[m.address.row];
-						if (row) {
-							row[m.address.col] = m.newValue;
-						}
+
+			// Apply structural row change first (if any)
+			if (result.rowOp) {
+				if (result.rowOp.type === "insertRows") {
+					// Undo of deleteRows → re-insert with saved data
+					const originalEntry = historyState().redoStack[historyState().redoStack.length - 1];
+					const originalRowOp = originalEntry?.rowOp;
+					if (originalRowOp?.type === "deleteRows" && originalRowOp.removedData.length > 0) {
+						_insertRowsWithData(result.rowOp.atIndex, originalRowOp.removedData);
+					} else {
+						applyRowOp(result.rowOp);
 					}
-				}),
-			);
-			return result.mutations;
+				} else {
+					applyRowOp(result.rowOp);
+				}
+			}
+
+			// Apply inverse cell mutations
+			if (result.mutations.length > 0) {
+				setCells(
+					produce((draft) => {
+						for (const m of result.mutations) {
+							const row = draft[m.address.row];
+							if (row) {
+								row[m.address.col] = m.newValue;
+							}
+						}
+					}),
+				);
+			}
+
+			return { mutations: result.mutations, rowChange: result.rowChange };
 		},
 
-		redo(): CellMutation[] | null {
+		redo(): UndoRedoResult | null {
 			const result = histRedo(historyState());
 			if (!result) return null;
 			setHistory(result.history);
 			setSelection(result.selection);
-			// Apply forward mutations
-			setCells(
-				produce((draft) => {
-					for (const m of result.mutations) {
-						const row = draft[m.address.row];
-						if (row) {
-							row[m.address.col] = m.newValue;
+
+			// Apply structural row change first (if any)
+			if (result.rowOp) {
+				applyRowOp(result.rowOp);
+			}
+
+			// Apply forward cell mutations
+			if (result.mutations.length > 0) {
+				setCells(
+					produce((draft) => {
+						for (const m of result.mutations) {
+							const row = draft[m.address.row];
+							if (row) {
+								row[m.address.col] = m.newValue;
+							}
 						}
-					}
-				}),
-			);
-			return result.mutations;
+					}),
+				);
+			}
+
+			return { mutations: result.mutations, rowChange: result.rowChange };
 		},
 
 		canUndo: () => histCanUndo(historyState()),

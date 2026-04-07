@@ -1,17 +1,29 @@
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 
-export interface ContextMenuItem {
-	label: string;
-	shortcut?: string | undefined;
-	disabled?: boolean | undefined;
-	action: () => void;
-}
+export type ContextMenuEntry =
+	| { type?: "action"; label: string; shortcut?: string; disabled?: boolean; action: () => void }
+	| { type: "separator" };
+
+/** @deprecated Use ContextMenuEntry instead */
+export type ContextMenuItem = ContextMenuEntry;
 
 interface ContextMenuProps {
 	x: number;
 	y: number;
-	items: ContextMenuItem[];
+	items: ContextMenuEntry[];
 	onClose: () => void;
+}
+
+type ActionEntry = Exclude<ContextMenuEntry, { type: "separator" }>;
+
+interface ResolvedEntry {
+	entry: ContextMenuEntry;
+	/** Index into the action-only list, or -1 for separators. */
+	actionIndex: number;
+}
+
+function isActionEntry(entry: ContextMenuEntry): entry is ActionEntry {
+	return entry.type !== "separator";
 }
 
 export default function ContextMenu(props: ContextMenuProps) {
@@ -19,7 +31,21 @@ export default function ContextMenu(props: ContextMenuProps) {
 	const itemRefs: HTMLButtonElement[] = [];
 	const [focusedIndex, setFocusedIndex] = createSignal(-1);
 
-	function handleClick(item: ContextMenuItem) {
+	const resolved = createMemo<ResolvedEntry[]>(() => {
+		let ai = 0;
+		return props.items.map((entry) => ({
+			entry,
+			actionIndex: isActionEntry(entry) ? ai++ : -1,
+		}));
+	});
+
+	const actionItems = createMemo(() =>
+		resolved()
+			.filter((r) => r.actionIndex >= 0)
+			.map((r) => r.entry as ActionEntry),
+	);
+
+	function handleClick(item: ActionEntry) {
 		if (item.disabled) return;
 		item.action();
 		props.onClose();
@@ -37,11 +63,12 @@ export default function ContextMenu(props: ContextMenuProps) {
 	}
 
 	function findNextEnabled(from: number, direction: 1 | -1): number {
-		const len = props.items.length;
+		const items = actionItems();
+		const len = items.length;
 		let next = from;
 		for (let i = 0; i < len; i++) {
 			next = (next + direction + len) % len;
-			if (!props.items[next]?.disabled) return next;
+			if (!items[next]?.disabled) return next;
 		}
 		return from;
 	}
@@ -66,7 +93,7 @@ export default function ContextMenu(props: ContextMenuProps) {
 			case "Enter":
 			case " ": {
 				event.preventDefault();
-				const item = props.items[focusedIndex()];
+				const item = actionItems()[focusedIndex()];
 				if (item && !item.disabled) handleClick(item);
 				break;
 			}
@@ -77,7 +104,7 @@ export default function ContextMenu(props: ContextMenuProps) {
 			}
 			case "End": {
 				event.preventDefault();
-				focusItem(findNextEnabled(props.items.length, -1));
+				focusItem(findNextEnabled(actionItems().length, -1));
 				break;
 			}
 		}
@@ -85,7 +112,7 @@ export default function ContextMenu(props: ContextMenuProps) {
 
 	onMount(() => {
 		document.addEventListener("mousedown", handleClickOutside);
-		const firstEnabled = props.items.findIndex((item) => !item.disabled);
+		const firstEnabled = actionItems().findIndex((item) => !item.disabled);
 		if (firstEnabled >= 0) {
 			queueMicrotask(() => focusItem(firstEnabled));
 		}
@@ -107,29 +134,36 @@ export default function ContextMenu(props: ContextMenuProps) {
 				top: `${props.y}px`,
 			}}
 		>
-			<For each={props.items}>
-				{(item, index) => (
-					<button
-						ref={(el) => { itemRefs[index()] = el; }}
-						class="se-context-menu__item"
-						classList={{
-							"se-context-menu__item--disabled": item.disabled,
-							"se-context-menu__item--focused": index() === focusedIndex(),
-						}}
-						role="menuitem"
-						tabIndex={index() === focusedIndex() ? 0 : -1}
-						aria-disabled={item.disabled || undefined}
-						onClick={() => handleClick(item)}
-						onMouseEnter={() => {
-							if (!item.disabled) focusItem(index());
-						}}
-					>
-						<span>{item.label}</span>
-						<Show when={item.shortcut}>
-							<span class="se-context-menu__shortcut">{item.shortcut}</span>
-						</Show>
-					</button>
-				)}
+			<For each={resolved()}>
+				{(r) => {
+					if (r.actionIndex < 0) {
+						return <div class="se-context-menu__separator" role="separator" />;
+					}
+					const item = r.entry as ActionEntry;
+					const ai = r.actionIndex;
+					return (
+						<button
+							ref={(el) => { itemRefs[ai] = el; }}
+							class="se-context-menu__item"
+							classList={{
+								"se-context-menu__item--disabled": item.disabled,
+								"se-context-menu__item--focused": ai === focusedIndex(),
+							}}
+							role="menuitem"
+							tabIndex={ai === focusedIndex() ? 0 : -1}
+							aria-disabled={item.disabled || undefined}
+							onClick={() => handleClick(item)}
+							onMouseEnter={() => {
+								if (!item.disabled) focusItem(ai);
+							}}
+						>
+							<span>{item.label}</span>
+							<Show when={item.shortcut}>
+								<span class="se-context-menu__shortcut">{item.shortcut}</span>
+							</Show>
+						</button>
+					);
+				}}
 			</For>
 		</div>
 	);

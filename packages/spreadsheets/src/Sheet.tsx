@@ -49,6 +49,8 @@ export function Sheet(props: SheetProps) {
 				onClipboard={props.onClipboard}
 				onColumnResize={props.onColumnResize}
 				onSort={props.onSort}
+				onRowInsert={props.onRowInsert}
+				onRowDelete={props.onRowDelete}
 				onCellPointerDown={props.onCellPointerDown}
 				onCellPointerMove={props.onCellPointerMove}
 				controllerRef={props.ref}

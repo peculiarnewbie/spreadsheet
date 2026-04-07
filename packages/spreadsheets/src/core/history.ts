@@ -1,4 +1,10 @@
-import type { CellMutation, Selection } from "../types";
+import type { CellMutation, CellValue, Selection } from "../types";
+
+// ── Row Operation Types ─────────────────────────────────────────────────────
+
+export type RowOperation =
+	| { type: "insertRows"; atIndex: number; count: number }
+	| { type: "deleteRows"; atIndex: number; count: number; removedData: CellValue[][] };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -7,6 +13,8 @@ export interface HistoryEntry {
 	inverse: CellMutation[];
 	selectionBefore: Selection;
 	selectionAfter: Selection;
+	/** Optional structural row operation recorded with this entry. */
+	rowOp?: RowOperation;
 }
 
 export interface HistoryStack {
@@ -35,8 +43,9 @@ export function pushHistory(
 	forward: CellMutation[],
 	selectionBefore: Selection,
 	selectionAfter: Selection,
+	rowOp?: RowOperation,
 ): HistoryStack {
-	if (forward.length === 0) return history;
+	if (forward.length === 0 && !rowOp) return history;
 
 	const inverse = forward.map<CellMutation>((m) => ({
 		address: m.address,
@@ -46,7 +55,7 @@ export function pushHistory(
 		source: m.source,
 	}));
 
-	const entry: HistoryEntry = { forward, inverse, selectionBefore, selectionAfter };
+	const entry: HistoryEntry = { forward, inverse, selectionBefore, selectionAfter, rowOp };
 
 	const undoStack = [...history.undoStack, entry].slice(-MAX_HISTORY);
 	return { undoStack, redoStack: [] };
@@ -54,16 +63,52 @@ export function pushHistory(
 
 // ── Undo / Redo ──────────────────────────────────────────────────────────────
 
+/** Info about what structural row change was performed during undo/redo. */
+export interface UndoRedoRowChange {
+	type: "insertRows" | "deleteRows";
+	atIndex: number;
+	count: number;
+}
+
 export interface UndoResult {
 	history: HistoryStack;
 	mutations: CellMutation[];
 	selection: Selection;
+	/** Describes the inverse row operation that should be applied. */
+	rowOp?: RowOperation;
+	/** Summarises the structural change for external callbacks. */
+	rowChange?: UndoRedoRowChange;
 }
 
 export function undo(history: HistoryStack): UndoResult | null {
 	if (history.undoStack.length === 0) return null;
 
 	const entry = history.undoStack[history.undoStack.length - 1]!;
+
+	// Compute the inverse row operation and the external-facing change description
+	let inverseRowOp: RowOperation | undefined;
+	let rowChange: UndoRedoRowChange | undefined;
+	if (entry.rowOp) {
+		if (entry.rowOp.type === "insertRows") {
+			// Undo insert → delete those rows
+			inverseRowOp = {
+				type: "deleteRows",
+				atIndex: entry.rowOp.atIndex,
+				count: entry.rowOp.count,
+				removedData: [], // rows were empty when inserted
+			};
+			rowChange = { type: "deleteRows", atIndex: entry.rowOp.atIndex, count: entry.rowOp.count };
+		} else {
+			// Undo delete → re-insert the rows (with data)
+			inverseRowOp = {
+				type: "insertRows",
+				atIndex: entry.rowOp.atIndex,
+				count: entry.rowOp.count,
+			};
+			rowChange = { type: "insertRows", atIndex: entry.rowOp.atIndex, count: entry.rowOp.count };
+		}
+	}
+
 	return {
 		history: {
 			undoStack: history.undoStack.slice(0, -1),
@@ -71,6 +116,8 @@ export function undo(history: HistoryStack): UndoResult | null {
 		},
 		mutations: entry.inverse,
 		selection: entry.selectionBefore,
+		rowOp: inverseRowOp,
+		rowChange,
 	};
 }
 
@@ -78,6 +125,17 @@ export function redo(history: HistoryStack): UndoResult | null {
 	if (history.redoStack.length === 0) return null;
 
 	const entry = history.redoStack[history.redoStack.length - 1]!;
+
+	// The forward row operation and its external-facing change description
+	let rowChange: UndoRedoRowChange | undefined;
+	if (entry.rowOp) {
+		if (entry.rowOp.type === "insertRows") {
+			rowChange = { type: "insertRows", atIndex: entry.rowOp.atIndex, count: entry.rowOp.count };
+		} else {
+			rowChange = { type: "deleteRows", atIndex: entry.rowOp.atIndex, count: entry.rowOp.count };
+		}
+	}
+
 	return {
 		history: {
 			undoStack: [...history.undoStack, entry],
@@ -85,6 +143,8 @@ export function redo(history: HistoryStack): UndoResult | null {
 		},
 		mutations: entry.forward,
 		selection: entry.selectionAfter,
+		rowOp: entry.rowOp,
+		rowChange,
 	};
 }
 

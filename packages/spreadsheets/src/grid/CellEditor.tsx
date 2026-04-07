@@ -13,6 +13,7 @@ interface CellEditorProps {
 	onCancel: () => void;
 	onTab: (shift: boolean) => void;
 	onEnter: (shift: boolean) => void;
+	onArrowNav: (direction: "up" | "down" | "left" | "right") => void;
 }
 
 export default function CellEditor(props: CellEditorProps) {
@@ -34,6 +35,20 @@ export default function CellEditor(props: CellEditorProps) {
 			event.preventDefault();
 			event.stopPropagation();
 			props.onCancel();
+		} else if (
+			event.key === "ArrowUp" ||
+			event.key === "ArrowDown" ||
+			event.key === "ArrowLeft" ||
+			event.key === "ArrowRight"
+		) {
+			event.preventDefault();
+			event.stopPropagation();
+			const direction = event.key === "ArrowUp" ? "up"
+				: event.key === "ArrowDown" ? "down"
+				: event.key === "ArrowLeft" ? "left"
+				: "right";
+			props.onCommit();
+			props.onArrowNav(direction);
 		}
 	}
 

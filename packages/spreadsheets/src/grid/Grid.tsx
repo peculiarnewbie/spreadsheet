@@ -37,7 +37,7 @@ import GridBody from "./GridBody";
 import CellEditor from "./CellEditor";
 import FormulaBar from "./FormulaBar";
 import SelectionOverlay from "./SelectionOverlay";
-import ContextMenu, { type ContextMenuItem } from "./ContextMenu";
+import ContextMenu, { type ContextMenuEntry } from "./ContextMenu";
 import SearchBar from "./SearchBar";
 import { createMatchSet, findMatches } from "../core/search";
 
@@ -63,6 +63,8 @@ interface GridProps {
 	}) => void) | undefined;
 	onColumnResize?: ((columnId: string, width: number) => void) | undefined;
 	onSort?: ((columnId: string, direction: "asc" | "desc") => void) | undefined;
+	onRowInsert?: ((atIndex: number, count: number) => void) | undefined;
+	onRowDelete?: ((atIndex: number, count: number) => void) | undefined;
 	onCellPointerDown?: ((address: CellAddress, event: MouseEvent) => boolean) | undefined;
 	onCellPointerMove?: ((address: CellAddress, event: MouseEvent) => boolean) | undefined;
 	controllerRef?: ((controller: SheetController) => void) | undefined;
@@ -479,6 +481,15 @@ export default function Grid(props: GridProps) {
 		setEditorSelectionAndFocus(nextEnd, nextEnd);
 	}
 
+	function focusGrid() {
+		queueMicrotask(() => {
+			// Only refocus if nothing else claimed focus (e.g. formula bar, external element)
+			if (document.activeElement && document.activeElement !== document.body) return;
+			const grid = viewportRef?.closest(".se-grid");
+			if (grid instanceof HTMLElement) grid.focus();
+		});
+	}
+
 	function handleEditorCommit() {
 		const editMode = props.store.editMode();
 		if (!editMode) return;
@@ -498,12 +509,15 @@ export default function Grid(props: GridProps) {
 			syncMutationToFormulaEngine(mutation);
 			props.onCellEdit?.(mutation);
 		}
+
+		focusGrid();
 	}
 
 	function handleEditCancel() {
 		props.store.setEditMode(null);
 		setReferenceInsertion(null);
 		setReferenceRange(null);
+		focusGrid();
 	}
 
 	function handleEditTab(shift: boolean) {
@@ -515,6 +529,10 @@ export default function Grid(props: GridProps) {
 			return;
 		}
 		handleNavigateAfterEdit(shift ? "up" : "down");
+	}
+
+	function handleEditArrowNav(direction: "up" | "down" | "left" | "right") {
+		handleNavigateAfterEdit(direction);
 	}
 
 	function handleNavigateAfterEdit(direction: "up" | "down" | "left" | "right") {
@@ -721,8 +739,42 @@ export default function Grid(props: GridProps) {
 		setContextMenu({ x: event.clientX, y: event.clientY });
 	}
 
-	const contextMenuItems = createMemo<ContextMenuItem[]>(() => {
+	function handleInsertRows(atIndex: number, count: number) {
+		const selBefore = props.store.selection();
+		props.store.insertRows(atIndex, count);
+		props.store.pushRowOperation(
+			{ type: "insertRows", atIndex, count },
+			selBefore,
+			props.store.selection(),
+		);
+		props.onRowInsert?.(atIndex, count);
+	}
+
+	function handleDeleteRows(atIndex: number, count: number) {
+		const selBefore = props.store.selection();
+		const removedData = props.store.deleteRows(atIndex, count);
+
+		// Clamp selection if it's now beyond the last row
+		const newRowCount = props.store.rowCount();
+		if (newRowCount > 0) {
+			const clampedRow = Math.min(selBefore.anchor.row, newRowCount - 1);
+			props.store.setSelection(
+				selectCell({ row: clampedRow, col: selBefore.anchor.col }),
+			);
+		}
+
+		props.store.pushRowOperation(
+			{ type: "deleteRows", atIndex, count, removedData },
+			selBefore,
+			props.store.selection(),
+		);
+		props.onRowDelete?.(atIndex, count);
+	}
+
+	const contextMenuItems = createMemo<ContextMenuEntry[]>(() => {
 		const isReadOnly = props.readOnly;
+		const sel = props.store.selection();
+		const anchorRow = sel.anchor.row;
 		return [
 			{
 				label: "Cut",
@@ -749,6 +801,22 @@ export default function Grid(props: GridProps) {
 					const mutations = deleteSelectedCells(props.store, props.columns);
 					applyBatchMutations(mutations);
 				},
+			},
+			{ type: "separator" as const },
+			{
+				label: "Insert row above",
+				disabled: isReadOnly,
+				action: () => handleInsertRows(anchorRow, 1),
+			},
+			{
+				label: "Insert row below",
+				disabled: isReadOnly,
+				action: () => handleInsertRows(anchorRow + 1, 1),
+			},
+			{
+				label: "Delete row",
+				disabled: isReadOnly || props.store.rowCount() <= 1,
+				action: () => handleDeleteRows(anchorRow, 1),
 			},
 		];
 	});
@@ -881,19 +949,37 @@ export default function Grid(props: GridProps) {
 				break;
 
 			case "undo": {
-				const undoMutations = props.store.undo();
-				if (undoMutations) {
-					syncMutationsToFormulaEngine(undoMutations);
-					props.onBatchEdit?.(undoMutations);
+				const undoResult = props.store.undo();
+				if (undoResult) {
+					if (undoResult.mutations.length > 0) {
+						syncMutationsToFormulaEngine(undoResult.mutations);
+						props.onBatchEdit?.(undoResult.mutations);
+					}
+					if (undoResult.rowChange) {
+						if (undoResult.rowChange.type === "insertRows") {
+							props.onRowInsert?.(undoResult.rowChange.atIndex, undoResult.rowChange.count);
+						} else {
+							props.onRowDelete?.(undoResult.rowChange.atIndex, undoResult.rowChange.count);
+						}
+					}
 				}
 				break;
 			}
 
 			case "redo": {
-				const redoMutations = props.store.redo();
-				if (redoMutations) {
-					syncMutationsToFormulaEngine(redoMutations);
-					props.onBatchEdit?.(redoMutations);
+				const redoResult = props.store.redo();
+				if (redoResult) {
+					if (redoResult.mutations.length > 0) {
+						syncMutationsToFormulaEngine(redoResult.mutations);
+						props.onBatchEdit?.(redoResult.mutations);
+					}
+					if (redoResult.rowChange) {
+						if (redoResult.rowChange.type === "insertRows") {
+							props.onRowInsert?.(redoResult.rowChange.atIndex, redoResult.rowChange.count);
+						} else {
+							props.onRowDelete?.(redoResult.rowChange.atIndex, redoResult.rowChange.count);
+						}
+					}
 				}
 				break;
 			}
@@ -1081,19 +1167,39 @@ export default function Grid(props: GridProps) {
 				getColumnMeta: (columnId) =>
 					props.columns.find((column) => column.id === columnId)?.meta,
 				undo: () => {
-					const mutations = props.store.undo();
-					if (mutations) {
-						syncMutationsToFormulaEngine(mutations);
-						props.onBatchEdit?.(mutations);
+					const result = props.store.undo();
+					if (result) {
+						if (result.mutations.length > 0) {
+							syncMutationsToFormulaEngine(result.mutations);
+							props.onBatchEdit?.(result.mutations);
+						}
+						if (result.rowChange) {
+							if (result.rowChange.type === "insertRows") {
+								props.onRowInsert?.(result.rowChange.atIndex, result.rowChange.count);
+							} else {
+								props.onRowDelete?.(result.rowChange.atIndex, result.rowChange.count);
+							}
+						}
 					}
 				},
 				redo: () => {
-					const mutations = props.store.redo();
-					if (mutations) {
-						syncMutationsToFormulaEngine(mutations);
-						props.onBatchEdit?.(mutations);
+					const result = props.store.redo();
+					if (result) {
+						if (result.mutations.length > 0) {
+							syncMutationsToFormulaEngine(result.mutations);
+							props.onBatchEdit?.(result.mutations);
+						}
+						if (result.rowChange) {
+							if (result.rowChange.type === "insertRows") {
+								props.onRowInsert?.(result.rowChange.atIndex, result.rowChange.count);
+							} else {
+								props.onRowDelete?.(result.rowChange.atIndex, result.rowChange.count);
+							}
+						}
 					}
 				},
+				insertRows: (atIndex, count) => handleInsertRows(atIndex, count),
+				deleteRows: (atIndex, count) => handleDeleteRows(atIndex, count),
 				canUndo: () => props.store.canUndo(),
 				canRedo: () => props.store.canRedo(),
 				getCanvasElement: () => {
@@ -1234,6 +1340,7 @@ export default function Grid(props: GridProps) {
 									onCancel={handleEditCancel}
 									onTab={handleEditTab}
 									onEnter={handleEditEnter}
+									onArrowNav={handleEditArrowNav}
 								/>
 							)}
 						</Show>
