@@ -28,13 +28,13 @@ export function mapKeyToCommand(event: KeyboardEvent): SheetCommand | null {
 	if (event.key === "ArrowLeft") return { type: "move", direction: "left", shift, ctrl };
 	if (event.key === "ArrowRight") return { type: "move", direction: "right", shift, ctrl };
 
-	// Edit commit with navigation
+	// Tab commits/navigates (even outside edit mode, moves selection)
 	if (event.key === "Tab") {
 		return { type: "editCommit", direction: shift ? "left" : "right" };
 	}
-	if (event.key === "Enter") {
-		return { type: "editCommit", direction: shift ? "up" : "down" };
-	}
+
+	// Enter starts editing (edit-mode Enter is handled by CellEditor directly)
+	if (event.key === "Enter") return { type: "editStart" };
 
 	// Edit mode
 	if (event.key === "F2") return { type: "editStart" };
@@ -48,7 +48,8 @@ export function mapKeyToCommand(event: KeyboardEvent): SheetCommand | null {
 		if (event.key === "a") return { type: "selectAll" };
 		if (event.key === "c") return { type: "copy" };
 		if (event.key === "x") return { type: "cut" };
-		if (event.key === "v") return { type: "paste" };
+		// Paste is handled via the native "paste" event, not keydown.
+		// if (event.key === "v") return { type: "paste" };
 		if (event.key === "z") return { type: "undo" };
 		if (event.key === "y") return { type: "redo" };
 		if (event.key === "f") return { type: "search" };

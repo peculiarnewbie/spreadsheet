@@ -140,6 +140,7 @@ function canInsertReferenceAtCaret(
 export default function Grid(props: GridProps) {
 	const customization = useSheetCustomization();
 
+	let gridRef: HTMLDivElement | undefined;
 	let viewportRef: HTMLDivElement | undefined;
 	let cellEditorInputRef: HTMLInputElement | undefined;
 	let formulaBarInputRef: HTMLInputElement | undefined;
@@ -485,8 +486,7 @@ export default function Grid(props: GridProps) {
 		queueMicrotask(() => {
 			// Only refocus if nothing else claimed focus (e.g. formula bar, external element)
 			if (document.activeElement && document.activeElement !== document.body) return;
-			const grid = viewportRef?.closest(".se-grid");
-			if (grid instanceof HTMLElement) grid.focus();
+			gridRef?.focus();
 		});
 	}
 
@@ -748,6 +748,7 @@ export default function Grid(props: GridProps) {
 			props.store.selection(),
 		);
 		props.onRowInsert?.(atIndex, count);
+		focusGrid();
 	}
 
 	function handleDeleteRows(atIndex: number, count: number) {
@@ -769,6 +770,7 @@ export default function Grid(props: GridProps) {
 			props.store.selection(),
 		);
 		props.onRowDelete?.(atIndex, count);
+		focusGrid();
 	}
 
 	const contextMenuItems = createMemo<ContextMenuEntry[]>(() => {
@@ -791,7 +793,12 @@ export default function Grid(props: GridProps) {
 				label: "Paste",
 				shortcut: "Ctrl+V",
 				disabled: isReadOnly,
-				action: () => void handlePaste(),
+				action: () => {
+					navigator.clipboard.readText().then(
+						(text) => handlePaste(text),
+						() => { /* clipboard access denied */ },
+					);
+				},
 			},
 			{
 				label: "Delete",
@@ -849,8 +856,7 @@ export default function Grid(props: GridProps) {
 		setSearchOpen(false);
 		setSearchQuery("");
 		setSearchCurrentIndex(-1);
-		const grid = viewportRef?.closest(".se-grid");
-		if (grid instanceof HTMLElement) grid.focus();
+		gridRef?.focus();
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -944,10 +950,6 @@ export default function Grid(props: GridProps) {
 				handleCut();
 				break;
 
-			case "paste":
-				void handlePaste();
-				break;
-
 			case "undo": {
 				const undoResult = props.store.undo();
 				if (undoResult) {
@@ -1030,36 +1032,31 @@ export default function Grid(props: GridProps) {
 		applyBatchMutations(mutations);
 	}
 
-	async function handlePaste() {
+	function handlePaste(text: string) {
 		if (props.readOnly) return;
-		try {
-			const text = await navigator.clipboard.readText();
-			const parsed = parseTSV(text);
-			if (parsed.length === 0) return;
+		const parsed = parseTSV(text);
+		if (parsed.length === 0) return;
 
-			const sel = props.store.selection();
-			const target = sel.anchor;
-			const mutations = buildPasteMutations(
-				parsed,
-				target,
-				props.store.cells,
-				props.columns,
-			);
+		const sel = props.store.selection();
+		const target = sel.anchor;
+		const mutations = buildPasteMutations(
+			parsed,
+			target,
+			props.store.cells,
+			props.columns,
+		);
 
-			applyBatchMutations(mutations);
-			setClipboardRange(null);
+		applyBatchMutations(mutations);
+		setClipboardRange(null);
 
-			const range = primaryRange(sel);
-			if (range) {
-				props.onClipboard?.({
-					action: "paste",
-					range,
-					text,
-					cells: parsed,
-				});
-			}
-		} catch {
-			// Clipboard access denied — silently ignore.
+		const range = primaryRange(sel);
+		if (range) {
+			props.onClipboard?.({
+				action: "paste",
+				range,
+				text,
+				cells: parsed,
+			});
 		}
 	}
 
@@ -1095,6 +1092,20 @@ export default function Grid(props: GridProps) {
 	});
 
 	onMount(() => {
+		// Attach native paste listener — Solid.js doesn't delegate paste events
+		if (gridRef) {
+			const onPaste = (e: ClipboardEvent) => {
+				if (props.store.editMode()) return; // let the cell editor handle it
+				const text = e.clipboardData?.getData("text/plain");
+				if (text) {
+					e.preventDefault();
+					handlePaste(text);
+				}
+			};
+			gridRef.addEventListener("paste", onPaste);
+			onCleanup(() => gridRef!.removeEventListener("paste", onPaste));
+		}
+
 		if (props.controllerRef) {
 			const controller: SheetController = {
 				getSelection: () => props.store.selection(),
@@ -1217,6 +1228,7 @@ export default function Grid(props: GridProps) {
 
 	return (
 		<div
+			ref={gridRef}
 			class="se-grid"
 			role="grid"
 			aria-label="Spreadsheet"
