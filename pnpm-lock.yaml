@@ -18,8 +18,8 @@ importers:
         specifier: ^1.121.0
         version: 1.168.9(solid-js@1.9.12)
       hyperformula:
-        specifier: ^2.0.0
-        version: 2.7.1
+        specifier: ^3.0.0
+        version: 3.2.0
       peculiar-sheets:
         specifier: workspace:*
         version: link:../../packages/spreadsheets
@@ -40,11 +40,11 @@ importers:
   apps/solid-sheet-www:
     dependencies:
       hyperformula:
-        specifier: ^2.0.0
-        version: 2.7.1
+        specifier: ^3.0.0
+        version: 3.2.0
       peculiar-sheets:
-        specifier: workspace:*
-        version: link:../../packages/spreadsheets
+        specifier: ^0.4.0
+        version: 0.4.0(solid-js@1.9.12)
       solid-js:
         specifier: ^1.9.11
         version: 1.9.12
@@ -77,8 +77,8 @@ importers:
         specifier: ^2.8.2
         version: 2.8.2
       hyperformula:
-        specifier: ^2.0.0
-        version: 2.7.1
+        specifier: ^3.0.0
+        version: 3.2.0
       solid-js:
         specifier: ^1.9.0
         version: 1.9.12
@@ -2269,6 +2269,9 @@ packages:
   hyperformula@2.7.1:
     resolution: {integrity: sha512-mpVF5zOyNpksZzgTaCQyRAzdC/X43+taz5x1n7zNbs/PUUv0AuLmsy2yfihCr+vihUzN/pk+gXBbOfNpXKOpgA==}
 
+  hyperformula@3.2.0:
+    resolution: {integrity: sha512-2vzQKKVMDPLsubZJb0JJWT/DhrkgIjsWj40Z9BIUVT6Jkl/YM5VtkLOP3agCieqW9HuqnXlWc+Vi+7XzQuC1Nw==}
+
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
     engines: {node: '>=0.10.0'}
@@ -2655,6 +2658,11 @@ packages:
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
+
+  peculiar-sheets@0.4.0:
+    resolution: {integrity: sha512-qmQHJ/ASwD9qif8A7VPjFs2DQNvsdEQ2KmXjQQtrdwJo5XeRCj+9e1C+tdond+N6ZTCETDjSHK+0jmNx7eqS2g==}
+    peerDependencies:
+      solid-js: ^1.9.0
 
   pend@1.2.0:
     resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
@@ -5347,6 +5355,11 @@ snapshots:
       chevrotain: 6.5.0
       tiny-emitter: 2.1.0
 
+  hyperformula@3.2.0:
+    dependencies:
+      chevrotain: 6.5.0
+      tiny-emitter: 2.1.0
+
   iconv-lite@0.7.2:
     dependencies:
       safer-buffer: 2.1.2
@@ -5664,6 +5677,13 @@ snapshots:
   path-to-regexp@8.4.2: {}
 
   pathe@2.0.3: {}
+
+  peculiar-sheets@0.4.0(solid-js@1.9.12):
+    dependencies:
+      '@tanstack/solid-virtual': 3.13.23(solid-js@1.9.12)
+      better-result: 2.8.2
+      hyperformula: 2.7.1
+      solid-js: 1.9.12
 
   pend@1.2.0:
     optional: true

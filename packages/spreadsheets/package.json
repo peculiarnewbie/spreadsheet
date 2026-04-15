@@ -1,6 +1,6 @@
 {
 	"name": "peculiar-sheets",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "A high-performance spreadsheet engine for SolidJS powered by HyperFormula",
 	"license": "GPL-3.0-only",
 	"author": "peculiarnewbie",
@@ -48,7 +48,7 @@
 	"dependencies": {
 		"@tanstack/solid-virtual": "^3.13.6",
 		"better-result": "^2.8.2",
-		"hyperformula": "^2.0.0"
+		"hyperformula": "^3.0.0"
 	},
 	"devDependencies": {
 		"@rolldown-plugin/solid": "^0.0.2",
