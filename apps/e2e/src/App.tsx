@@ -17,6 +17,7 @@ import SortExternalPage from "./routes/sort-external";
 import SortViewPage from "./routes/sort-view";
 import SortMutationPage from "./routes/sort-mutation";
 import SortMutationFormulasPage from "./routes/sort-mutation-formulas";
+import FormulaRowsPage from "./routes/formula-rows";
 
 const rootRoute = createRootRoute({
 	component: () => <Outlet />,
@@ -40,6 +41,7 @@ const indexRoute = createRoute({
 				<li><a href="/sort-view">Sort View</a></li>
 				<li><a href="/sort-mutation">Sort Mutation</a></li>
 				<li><a href="/sort-mutation-formulas">Sort Mutation Formulas</a></li>
+				<li><a href="/formula-rows">Formula + Row Ops</a></li>
 			</ul>
 		</nav>
 	),
@@ -117,6 +119,12 @@ const sortMutationFormulasRoute = createRoute({
 	component: SortMutationFormulasPage,
 });
 
+const formulaRowsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/formula-rows",
+	component: FormulaRowsPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	indexRoute,
 	basicRoute,
@@ -131,6 +139,7 @@ const routeTree = rootRoute.addChildren([
 	sortViewRoute,
 	sortMutationRoute,
 	sortMutationFormulasRoute,
+	formulaRowsRoute,
 ]);
 
 const router = createRouter({ routeTree });
