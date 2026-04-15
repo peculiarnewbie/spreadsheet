@@ -546,8 +546,12 @@ export function createReconciler(
 				for (let r = 0; r < data.length; r++) {
 					const dataRow = data[r];
 					if (!dataRow) continue;
-					for (let c = 0; c < dataRow.length; c++) {
-						const externalValue = dataRow[c] ?? null;
+					// Iterate over ALL columns so short/empty external rows
+					// (e.g. [] from HyperFormula's addRows) correctly null-out
+					// stale internal values.
+					const colEnd = Math.max(dataRow.length, newColCount);
+					for (let c = 0; c < colEnd; c++) {
+						const externalValue = (c < dataRow.length ? dataRow[c] : null) ?? null;
 						const internalValue = store.cells[r]?.[c] ?? null;
 						if (externalValue !== internalValue) {
 							mutations.push({ row: r, col: c, value: externalValue });

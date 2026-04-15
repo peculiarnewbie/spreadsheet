@@ -127,11 +127,20 @@ describe("workbook coordinator", () => {
 		internals.attachDataGetter(summary.sheetKey, () => summaryCells);
 
 		const insertChange = coordinator.insertRows(data.sheetKey, 1, 1)!;
+		const insertData = insertChange.snapshots.find((entry) => entry.sheetKey === "data")!;
 		const insertSummary = insertChange.snapshots.find((entry) => entry.sheetKey === "summary");
+
+		// The newly inserted row must be padded to the same column count as
+		// existing rows — HyperFormula serialises blank rows as [] which would
+		// cause the reconciler to skip the row entirely if not padded.
+		expect(insertData.cells).toHaveLength(4);
+		expect(insertData.cells[1]).toEqual([null, null]); // blank inserted row
+		expect(insertData.cells[2]).toEqual(["Beta", 20]); // shifted down
+
 		expect(insertSummary?.cells[0]?.[1]).toBe("=SUM(Data!B1:B4)");
 		expect(insertSummary?.cells[1]?.[1]).toBe("=Data!B3");
 
-		dataCells = insertChange.snapshots.find((entry) => entry.sheetKey === "data")!.cells;
+		dataCells = insertData.cells;
 		summaryCells = insertSummary!.cells;
 
 		const deleteChange = coordinator.deleteRows(data.sheetKey, 1, 1)!;

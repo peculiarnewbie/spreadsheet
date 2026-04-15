@@ -135,7 +135,19 @@ function normalizeSnapshotValue(value: unknown): CellValue {
 }
 
 function normalizeSnapshotRows(rows: unknown[][]): CellValue[][] {
-	return rows.map((row) => row.map((value) => normalizeSnapshotValue(value)));
+	// Determine the expected column count so empty rows (e.g. from
+	// HyperFormula's addRows which serialises blank rows as []) are
+	// padded to the correct width.  Without padding, downstream
+	// reconciliation loops that iterate `row.length` will skip the
+	// blank row entirely and leave stale data in the store.
+	const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+	return rows.map((row) => {
+		const normalized = row.map((value) => normalizeSnapshotValue(value));
+		while (normalized.length < maxCols) {
+			normalized.push(null);
+		}
+		return normalized;
+	});
 }
 
 function normalizeSheetContent(cells: CellValue[][]): CellValue[][] {
