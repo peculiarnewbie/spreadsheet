@@ -37,18 +37,21 @@ export default function CellEditor(props: CellEditorProps) {
 			props.onCancel();
 		} else if (
 			event.key === "ArrowUp" ||
-			event.key === "ArrowDown" ||
-			event.key === "ArrowLeft" ||
-			event.key === "ArrowRight"
+			event.key === "ArrowDown"
 		) {
 			event.preventDefault();
 			event.stopPropagation();
 			const direction = event.key === "ArrowUp" ? "up"
-				: event.key === "ArrowDown" ? "down"
-				: event.key === "ArrowLeft" ? "left"
-				: "right";
+				: "down";
 			props.onCommit();
 			props.onArrowNav(direction);
+		} else if (
+			event.key === "ArrowLeft" ||
+			event.key === "ArrowRight"
+		) {
+			// Keep native caret movement inside the editor, but don't let the grid
+			// treat horizontal arrows as cell navigation while editing.
+			event.stopPropagation();
 		}
 	}
 
