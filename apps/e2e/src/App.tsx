@@ -19,6 +19,7 @@ import SortMutationPage from "./routes/sort-mutation";
 import SortMutationFormulasPage from "./routes/sort-mutation-formulas";
 import FormulaRowsPage from "./routes/formula-rows";
 import FormulaRowDeletePage from "./routes/formula-row-delete";
+import CrossSheetPage from "./routes/cross-sheet";
 
 const rootRoute = createRootRoute({
 	component: () => <Outlet />,
@@ -44,6 +45,7 @@ const indexRoute = createRoute({
 				<li><a href="/sort-mutation-formulas">Sort Mutation Formulas</a></li>
 				<li><a href="/formula-rows">Formula + Row Ops</a></li>
 				<li><a href="/formula-row-delete">Formula + Row Delete</a></li>
+				<li><a href="/cross-sheet">Cross Sheet</a></li>
 			</ul>
 		</nav>
 	),
@@ -133,6 +135,12 @@ const formulaRowDeleteRoute = createRoute({
 	component: FormulaRowDeletePage,
 });
 
+const crossSheetRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/cross-sheet",
+	component: CrossSheetPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	indexRoute,
 	basicRoute,
@@ -149,6 +157,7 @@ const routeTree = rootRoute.addChildren([
 	sortMutationFormulasRoute,
 	formulaRowsRoute,
 	formulaRowDeleteRoute,
+	crossSheetRoute,
 ]);
 
 const router = createRouter({ routeTree });

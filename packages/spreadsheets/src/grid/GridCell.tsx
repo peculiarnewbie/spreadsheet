@@ -12,6 +12,7 @@ interface GridCellProps {
 	searchCurrent?: boolean;
 	customClass?: string;
 	onMouseDown: (event: MouseEvent) => void;
+	onMouseEnter?: (event: MouseEvent) => void;
 	onDblClick: () => void;
 }
 
@@ -45,6 +46,7 @@ export default function GridCell(props: GridCellProps) {
 				left: isPinned() ? `${props.pinnedLeft}px` : undefined,
 			}}
 			onMouseDown={props.onMouseDown}
+			onMouseEnter={(event) => props.onMouseEnter?.(event)}
 			onDblClick={props.onDblClick}
 		>
 			<span class="se-cell__text">{text()}</span>

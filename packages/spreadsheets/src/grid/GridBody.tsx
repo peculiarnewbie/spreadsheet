@@ -22,6 +22,7 @@ interface GridBodyProps {
 	totalRows: number;
 	getDisplayValue: (row: number, col: number) => CellValue;
 	onCellMouseDown: (addr: CellAddress, event: MouseEvent) => void;
+	onCellMouseEnter?: (addr: CellAddress, event: MouseEvent) => void;
 	onRowHeaderMouseDown?: (row: number, event: MouseEvent) => void;
 	onCellDblClick: (addr: CellAddress) => void;
 	pinnedLeftOffsets: number[];
@@ -98,6 +99,7 @@ export default function GridBody(props: GridBodyProps) {
 											searchCurrent={addressMatchesCurrent(addr(), props.searchCurrentAddress)}
 											{...(customization?.getCellClass ? { customClass: customization.getCellClass(rowIdx, colIdx()) } : {})}
 											onMouseDown={(e) => props.onCellMouseDown(addr(), e)}
+											onMouseEnter={(e) => props.onCellMouseEnter?.(addr(), e)}
 											onDblClick={() => props.onCellDblClick(addr())}
 										/>
 									);

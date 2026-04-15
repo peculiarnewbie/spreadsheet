@@ -79,6 +79,44 @@ const summarySheetId = hf.getSheetId(hf.addSheet("Summary"))!;
 <Sheet data={summaryRows} columns={summaryCols} formulaEngine={{ instance: hf, sheetId: summarySheetId }} />
 ```
 
+That shared-engine pattern is enough for cross-sheet evaluation.
+
+For host-owned faux-workbook behavior, use the headless workbook coordinator:
+
+```tsx
+import HyperFormula from "hyperformula";
+import { Sheet, createWorkbookCoordinator } from "peculiar-sheets";
+
+const hf = HyperFormula.buildEmpty({ licenseKey: "gpl-v3" });
+const workbook = createWorkbookCoordinator({ engine: hf });
+
+const dataWorkbook = workbook.bindSheet({
+	sheetKey: "data",
+	formulaName: "Data",
+});
+
+const summaryWorkbook = workbook.bindSheet({
+	sheetKey: "summary",
+	formulaName: "Summary",
+});
+
+<Sheet data={dataRows} columns={dataCols} workbook={dataWorkbook} />
+<Sheet data={summaryRows} columns={summaryCols} workbook={summaryWorkbook} />
+```
+
+Workbook mode keeps `Sheet` embeddable while adding:
+
+- Cross-sheet click/drag reference insertion
+- Cross-sheet reference highlighting
+- Workbook-correct row insert/delete and mutation-sort snapshots through HyperFormula
+
+Notes:
+
+- The host owns workbook layout and naming UI.
+- `formulaName` is fixed for the lifetime of a workbook binding in v1.
+- Structural workbook sync is driven by `workbook.subscribe(...)` snapshots, not just `onRowInsert` / `onRowDelete`.
+- Non-goals in v1: built-in workbook/tabs UI, sheet rename, column insert/delete, workbook-wide non-structural undo
+
 ## Props
 
 | Prop | Type | Description |
@@ -89,6 +127,7 @@ const summarySheetId = hf.getSheetId(hf.addSheet("Summary"))!;
 | `rowHeight` | `number?` | Row height in px (default `28`) |
 | `readOnly` | `boolean?` | Disable editing |
 | `formulaEngine` | `FormulaEngineConfig?` | HyperFormula instance + sheet ID |
+| `workbook` | `WorkbookSheetBinding?` | Headless workbook binding for shared cross-sheet coordination |
 | `showFormulaBar` | `boolean?` | Show the formula bar |
 | `showReferenceHeaders` | `boolean?` | Show A1-style column/row headers |
 | `sortBehavior` | `"external" \| "view" \| "mutation"` | Built-in sort mode (`view` by default) |
@@ -176,6 +215,12 @@ import type {
 	SheetController,
 	SheetCustomization,
 	SheetProps,
+	WorkbookCoordinator,
+	WorkbookCoordinatorOptions,
+	WorkbookSheetBinding,
+	WorkbookSheetDefinition,
+	WorkbookStructuralChange,
+	WorkbookStructuralOrigin,
 } from "peculiar-sheets";
 ```
 
@@ -184,6 +229,7 @@ Utility functions are also exported:
 ```tsx
 import {
 	addressToA1,
+	createWorkbookCoordinator,
 	rangeToA1,
 	isFormulaValue,
 	shiftFormulaByDelta,

@@ -1,3 +1,5 @@
+import type { WorkbookSheetBinding } from "./workbook/types";
+
 // ── Cell Primitives ──────────────────────────────────────────────────────────
 
 export type CellValue = string | number | boolean | null;
@@ -164,6 +166,8 @@ export interface SheetProps {
 	readOnly?: boolean;
 	/** Optional HyperFormula integration. */
 	formulaEngine?: FormulaEngineConfig;
+	/** Optional headless workbook binding for cross-sheet coordination. */
+	workbook?: WorkbookSheetBinding;
 	/** When true, renders a formula bar for the selected cell. */
 	showFormulaBar?: boolean;
 	/** When true, renders spreadsheet-style row/column reference headers. */
