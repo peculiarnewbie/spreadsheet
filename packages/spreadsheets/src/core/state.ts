@@ -21,9 +21,11 @@ import {
 	canRedo as histCanRedo,
 	canUndo as histCanUndo,
 	createHistory,
+	pushColumnResizeHistory,
 	pushMutationHistory,
 	pushRowOperationHistory,
 	pushRowReorderHistory,
+	pushRowResizeHistory,
 	redo as histRedo,
 	undo as histUndo,
 } from "./history";
@@ -41,6 +43,8 @@ export interface UndoRedoResult {
 	mutations: CellMutation[];
 	rowChange?: UndoRedoRowChange;
 	rowReorder?: RowReorderMutation;
+	columnResize?: { columnId: string; width: number };
+	rowResize?: { rowId: number; height: number };
 }
 
 export interface SheetStore {
@@ -78,6 +82,16 @@ export interface SheetStore {
 	pushRowOperation(rowOp: RowOperation, selectionBefore: Selection, selectionAfter: Selection): void;
 	pushRowReorder(
 		rowReorder: Omit<RowReorderMutation, "indexOrder" | "source">,
+		selectionBefore: Selection,
+		selectionAfter: Selection,
+	): void;
+	pushColumnResize(
+		columnResize: { columnId: string; oldWidth: number; newWidth: number },
+		selectionBefore: Selection,
+		selectionAfter: Selection,
+	): void;
+	pushRowResize(
+		rowResize: { rowId: number; oldHeight: number; newHeight: number },
 		selectionBefore: Selection,
 		selectionAfter: Selection,
 	): void;
@@ -407,6 +421,22 @@ export function createSheetStore(
 			setHistory((prev) => pushRowReorderHistory(prev, rowReorder, selectionBefore, selectionAfter));
 		},
 
+		pushColumnResize(
+			columnResize: { columnId: string; oldWidth: number; newWidth: number },
+			selectionBefore: Selection,
+			selectionAfter: Selection,
+		) {
+			setHistory((prev) => pushColumnResizeHistory(prev, columnResize, selectionBefore, selectionAfter));
+		},
+
+		pushRowResize(
+			rowResize: { rowId: number; oldHeight: number; newHeight: number },
+			selectionBefore: Selection,
+			selectionAfter: Selection,
+		) {
+			setHistory((prev) => pushRowResizeHistory(prev, rowResize, selectionBefore, selectionAfter));
+		},
+
 		undo(): UndoRedoResult | null {
 			const result = histUndo(historyState());
 			if (!result) return null;
@@ -452,10 +482,28 @@ export function createSheetStore(
 				reorderRows(result.rowReorder.newOrder);
 			}
 
+			if (result.columnResize) {
+				setColWidths((prev) => {
+					const next = new Map(prev);
+					next.set(result.columnResize!.columnId, result.columnResize!.width);
+					return next;
+				});
+			}
+
+			if (result.rowResize) {
+				setRowHeights((prev) => {
+					const next = new Map(prev);
+					next.set(result.rowResize!.rowId, result.rowResize!.height);
+					return next;
+				});
+			}
+
 			return {
 				mutations: result.mutations,
 				rowChange: result.rowChange,
 				rowReorder: result.rowReorder,
+				columnResize: result.columnResize,
+				rowResize: result.rowResize,
 			};
 		},
 
@@ -488,10 +536,28 @@ export function createSheetStore(
 				reorderRows(result.rowReorder.newOrder);
 			}
 
+			if (result.columnResize) {
+				setColWidths((prev) => {
+					const next = new Map(prev);
+					next.set(result.columnResize!.columnId, result.columnResize!.width);
+					return next;
+				});
+			}
+
+			if (result.rowResize) {
+				setRowHeights((prev) => {
+					const next = new Map(prev);
+					next.set(result.rowResize!.rowId, result.rowResize!.height);
+					return next;
+				});
+			}
+
 			return {
 				mutations: result.mutations,
 				rowChange: result.rowChange,
 				rowReorder: result.rowReorder,
+				columnResize: result.columnResize,
+				rowResize: result.rowResize,
 			};
 		},
 

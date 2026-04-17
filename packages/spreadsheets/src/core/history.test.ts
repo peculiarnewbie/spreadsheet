@@ -3,8 +3,10 @@ import {
 	canRedo,
 	canUndo,
 	createHistory,
+	pushColumnResizeHistory,
 	pushMutationHistory,
 	pushRowReorderHistory,
+	pushRowResizeHistory,
 	redo,
 	undo,
 } from "./history";
@@ -108,6 +110,50 @@ describe("history", () => {
 			newOrder: [11, 12, 10],
 			indexOrder: [2, 0, 1],
 			source: "redo",
+		});
+	});
+
+	it("should support column resize undo and redo", () => {
+		let h = createHistory();
+		h = pushColumnResizeHistory(
+			h,
+			{ columnId: "name", oldWidth: 120, newWidth: 180 },
+			sel0,
+			sel1,
+		);
+
+		const undoResult = undo(h)!;
+		expect(undoResult.columnResize).toEqual({
+			columnId: "name",
+			width: 120,
+		});
+
+		const redoResult = redo(undoResult.history)!;
+		expect(redoResult.columnResize).toEqual({
+			columnId: "name",
+			width: 180,
+		});
+	});
+
+	it("should support row resize undo and redo", () => {
+		let h = createHistory();
+		h = pushRowResizeHistory(
+			h,
+			{ rowId: 42, oldHeight: 28, newHeight: 56 },
+			sel0,
+			sel1,
+		);
+
+		const undoResult = undo(h)!;
+		expect(undoResult.rowResize).toEqual({
+			rowId: 42,
+			height: 28,
+		});
+
+		const redoResult = redo(undoResult.history)!;
+		expect(redoResult.rowResize).toEqual({
+			rowId: 42,
+			height: 56,
 		});
 	});
 });

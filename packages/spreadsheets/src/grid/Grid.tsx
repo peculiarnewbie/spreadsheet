@@ -482,6 +482,16 @@ export default function Grid(props: GridProps) {
 		props.onRowResize?.(rowId, height);
 	}
 
+	function notifyColumnResizeState(columnId: string, width: number) {
+		props.onColumnSizingChange?.(mapToRecord(props.store.columnWidths()));
+		props.onColumnResize?.(columnId, width);
+	}
+
+	function notifyRowResizeState(rowId: number, height: number) {
+		props.onRowSizingChange?.(mapToRecord(props.store.rowHeights()));
+		props.onRowResize?.(rowId, height);
+	}
+
 	function mapModelToVisualAddress(address: CellAddress): CellAddress | null {
 		const rowId = props.store.getRowIdAtPhysicalRow(address.row);
 		if (rowId === null) return null;
@@ -1873,6 +1883,12 @@ export default function Grid(props: GridProps) {
 						syncRowOrderToFormulaEngine(undoResult.rowReorder.indexOrder);
 						props.onRowReorder?.(undoResult.rowReorder);
 					}
+					if (undoResult.columnResize && props.columnSizing === undefined) {
+						notifyColumnResizeState(undoResult.columnResize.columnId, undoResult.columnResize.width);
+					}
+					if (undoResult.rowResize && props.rowSizing === undefined) {
+						notifyRowResizeState(undoResult.rowResize.rowId, undoResult.rowResize.height);
+					}
 				}
 				break;
 			}
@@ -1899,6 +1915,12 @@ export default function Grid(props: GridProps) {
 					if (redoResult.rowReorder) {
 						syncRowOrderToFormulaEngine(redoResult.rowReorder.indexOrder);
 						props.onRowReorder?.(redoResult.rowReorder);
+					}
+					if (redoResult.columnResize && props.columnSizing === undefined) {
+						notifyColumnResizeState(redoResult.columnResize.columnId, redoResult.columnResize.width);
+					}
+					if (redoResult.rowResize && props.rowSizing === undefined) {
+						notifyRowResizeState(redoResult.rowResize.rowId, redoResult.rowResize.height);
 					}
 				}
 				break;
@@ -2052,10 +2074,18 @@ export default function Grid(props: GridProps) {
 	function finalizeResizeSession() {
 		const session = resizeSession();
 		if (!session?.isActive) return;
+		const selection = props.store.selection();
 
 		if (session.previewSize !== session.startSize) {
 			if (session.axis === "column") {
 				const columnId = String(session.targetId);
+				if (props.columnSizing === undefined) {
+					props.store.pushColumnResize(
+						{ columnId, oldWidth: session.startSize, newWidth: session.previewSize },
+						selection,
+						selection,
+					);
+				}
 				if (props.resizeMode === "onEnd") {
 					commitColumnResize(columnId, session.previewSize);
 				} else {
@@ -2063,6 +2093,13 @@ export default function Grid(props: GridProps) {
 				}
 			} else {
 				const rowId = Number(session.targetId);
+				if (props.rowSizing === undefined) {
+					props.store.pushRowResize(
+						{ rowId, oldHeight: session.startSize, newHeight: session.previewSize },
+						selection,
+						selection,
+					);
+				}
 				if (props.resizeMode === "onEnd") {
 					commitRowResize(rowId, session.previewSize);
 				} else {
@@ -2202,6 +2239,12 @@ export default function Grid(props: GridProps) {
 								syncRowOrderToFormulaEngine(result.rowReorder.indexOrder);
 								props.onRowReorder?.(result.rowReorder);
 							}
+							if (result.columnResize && props.columnSizing === undefined) {
+								notifyColumnResizeState(result.columnResize.columnId, result.columnResize.width);
+							}
+							if (result.rowResize && props.rowSizing === undefined) {
+								notifyRowResizeState(result.rowResize.rowId, result.rowResize.height);
+							}
 						}
 					},
 				redo: () => {
@@ -2226,6 +2269,12 @@ export default function Grid(props: GridProps) {
 							if (result.rowReorder) {
 								syncRowOrderToFormulaEngine(result.rowReorder.indexOrder);
 								props.onRowReorder?.(result.rowReorder);
+							}
+							if (result.columnResize && props.columnSizing === undefined) {
+								notifyColumnResizeState(result.columnResize.columnId, result.columnResize.width);
+							}
+							if (result.rowResize && props.rowSizing === undefined) {
+								notifyRowResizeState(result.rowResize.rowId, result.rowResize.height);
 							}
 						}
 					},
