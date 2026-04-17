@@ -1,7 +1,14 @@
-import type { CellValue } from "../types";
+import { Show } from "solid-js";
+import type { JSX } from "solid-js";
+import type { CellRenderContext, CellValue } from "../types";
 
 interface GridCellProps {
-	displayValue: CellValue;
+	/** Raw cell value (pre-format). Passed to renderCell / title hooks. */
+	rawValue: CellValue;
+	/** Text to render in the default inner span (already passed through formatValue or the default). */
+	formattedText: string;
+	/** Physical row index (post-sort). */
+	row: number;
 	width: number;
 	height: number;
 	colIndex: number;
@@ -11,19 +18,29 @@ interface GridCellProps {
 	searchMatch?: boolean;
 	searchCurrent?: boolean;
 	customClass?: string;
+	/**
+	 * Optional title override.
+	 * - `undefined` → default to `formattedText || undefined`
+	 * - `""` → suppress title
+	 * - any other string → use verbatim
+	 */
+	title?: string;
+	/** Optional custom cell-content renderer. Replaces only the inner span. */
+	renderCell?: (ctx: CellRenderContext) => JSX.Element;
+	/** True while the CellEditor overlays this cell. */
+	isEditing?: boolean;
 	onMouseDown: (event: MouseEvent) => void;
 	onMouseEnter?: (event: MouseEvent) => void;
 	onDblClick: () => void;
 }
 
-function formatCellValue(value: CellValue): string {
-	if (value === null || value === undefined) return "";
-	if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-	return String(value);
+function resolveTitle(title: string | undefined, formattedText: string): string | undefined {
+	if (title === undefined) return formattedText || undefined;
+	if (title === "") return undefined;
+	return title;
 }
 
 export default function GridCell(props: GridCellProps) {
-	const text = () => formatCellValue(props.displayValue);
 	const isPinned = () => props.pinnedLeft != null && props.pinnedLeft >= 0;
 
 	return (
@@ -38,7 +55,7 @@ export default function GridCell(props: GridCellProps) {
 			role="gridcell"
 			aria-colindex={props.colIndex + 1}
 			aria-readonly={props.readOnly || undefined}
-			title={text() || undefined}
+			title={resolveTitle(props.title, props.formattedText)}
 			style={{
 				width: `${props.width}px`,
 				height: `${props.height}px`,
@@ -49,7 +66,19 @@ export default function GridCell(props: GridCellProps) {
 			onMouseEnter={(event) => props.onMouseEnter?.(event)}
 			onDblClick={props.onDblClick}
 		>
-			<span class="se-cell__text">{text()}</span>
+			<Show
+				when={props.renderCell}
+				fallback={<span class="se-cell__text">{props.formattedText}</span>}
+			>
+				{props.renderCell!({
+					value: props.rawValue,
+					formattedText: props.formattedText,
+					row: props.row,
+					col: props.colIndex,
+					readOnly: props.readOnly ?? false,
+					isEditing: props.isEditing ?? false,
+				})}
+			</Show>
 		</div>
 	);
 }

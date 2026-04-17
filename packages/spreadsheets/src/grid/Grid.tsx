@@ -92,6 +92,32 @@ function cellValueToEditorText(value: CellValue): string {
 	return String(value);
 }
 
+/**
+ * Development-only warning: when a column sets `formatValue` but not
+ * `parseValue`, the editor will seed with formatted text (e.g. `"Save"`) and
+ * the commit path will coerce that text via default type inference —
+ * overwriting any structural wrapper stored in the raw cell value (e.g.
+ * `NSLOCTEXT(...)`). Warn once per column to catch this at dev time.
+ */
+const formatValueWarned = new WeakSet<ColumnDef>();
+function isProductionEnv(): boolean {
+	const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } })
+		.process;
+	return proc?.env?.NODE_ENV === "production";
+}
+function warnIfFormatValueWithoutParseValue(col: ColumnDef | undefined): void {
+	if (!col || !col.formatValue || col.parseValue) return;
+	if (formatValueWarned.has(col)) return;
+	formatValueWarned.add(col);
+	if (isProductionEnv()) return;
+	// eslint-disable-next-line no-console
+	console.warn(
+		`[spreadsheets] Column "${col.id}" sets \`formatValue\` without \`parseValue\`. ` +
+			`Committing unchanged formatted text will overwrite the raw value. ` +
+			`Add a matching \`parseValue\` hook to preserve structural metadata.`,
+	);
+}
+
 function normalizeFormulaText(text: string): string {
 	const trimmed = text.trim();
 	if (!trimmed.startsWith("=")) return trimmed;
@@ -738,7 +764,11 @@ export default function Grid(props: GridProps) {
 		if (colDef?.editable === false) return;
 
 		const rawValue = getRawCellValue(addr.row, addr.col);
-		const nextText = options?.initialText ?? cellValueToEditorText(rawValue);
+		warnIfFormatValueWithoutParseValue(colDef);
+		const seedText = colDef?.formatValue
+			? colDef.formatValue(rawValue, { row: addr.row, col: addr.col })
+			: cellValueToEditorText(rawValue);
+		const nextText = options?.initialText ?? seedText;
 		props.store.setEditMode({ address: addr, initialValue: rawValue });
 		setEditorText(nextText);
 		setEditorSource(options?.source ?? "cell");
@@ -828,9 +858,18 @@ export default function Grid(props: GridProps) {
 	function handleEditorCommit() {
 		const editMode = props.store.editMode();
 		if (!editMode) return;
-		const nextValue = parseEditValue(editMode.initialValue, editorText());
 		const physicalRow = getPhysicalRowForVisualRow(editMode.address.row);
 		const rowId = getRowIdAtVisualRow(editMode.address.row) ?? props.store.getRowIdAtPhysicalRow(physicalRow);
+		const colDef = props.columns[editMode.address.col];
+		const previousValue =
+			props.store.cells[physicalRow]?.[editMode.address.col] ?? null;
+		const nextValue = colDef?.parseValue
+			? colDef.parseValue(editorText(), {
+					previousValue,
+					row: physicalRow,
+					col: editMode.address.col,
+				})
+			: parseEditValue(editMode.initialValue, editorText());
 
 		props.store.setEditMode(null);
 
@@ -2018,6 +2057,8 @@ export default function Grid(props: GridProps) {
 								visibleRows={visibleRows()}
 								totalRows={props.store.rowCount()}
 								getDisplayValue={getDisplayCellValue}
+								getRawValue={getRawCellValue}
+								editingAddress={props.store.editMode()?.address ?? null}
 							onCellMouseDown={handleCellMouseDown}
 							onCellMouseEnter={handleCellMouseEnter}
 							onRowHeaderMouseDown={handleRowHeaderMouseDown}

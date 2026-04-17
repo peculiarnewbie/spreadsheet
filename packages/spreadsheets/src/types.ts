@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import type { WorkbookSheetBinding } from "./workbook/types";
 
 // ── Cell Primitives ──────────────────────────────────────────────────────────
@@ -40,6 +41,37 @@ export interface SortState {
 
 // ── Column Definitions ───────────────────────────────────────────────────────
 
+/**
+ * Base context passed to every column-level hook.
+ * `row` is the physical (post-sort) row index; `col` is the column index.
+ */
+export interface CellContext {
+	row: number;
+	col: number;
+}
+
+/** Context for `ColumnDef.parseValue`. */
+export interface ParseValueContext extends CellContext {
+	/** The raw cell value immediately before this commit — read fresh from the store. */
+	previousValue: CellValue;
+}
+
+/** Context for `ColumnDef.renderCell`. */
+export interface CellRenderContext extends CellContext {
+	/** Raw stored value (pre-format, pre-formula-eval for non-formula cells). */
+	value: CellValue;
+	/** Result of `formatValue` (or the default stringifier) — always available. */
+	formattedText: string;
+	/** True when this column / sheet is read-only. */
+	readOnly: boolean;
+	/**
+	 * True while the CellEditor is overlaying this cell (z-index 20). Heavy
+	 * renderers should return `null` or a cheap fallback here; the editor input
+	 * obscures the cell content, so expensive work would be wasted.
+	 */
+	isEditing: boolean;
+}
+
 export interface ColumnDef {
 	id: string;
 	header: string;
@@ -60,6 +92,58 @@ export interface ColumnDef {
 		modelRow: number,
 		columnId: string,
 	) => string | number | boolean | null;
+
+	// ── Custom rendering / value transforms ──────────────────────────────────
+	// All optional. See docs/custom-cells.md or README for end-to-end examples.
+
+	/**
+	 * Transform a raw CellValue into text for cell rendering AND editor seeding.
+	 * Does NOT affect the formula bar, search matching, sort keys, or clipboard
+	 * output — those continue to operate on raw/display values.
+	 *
+	 * Example: strip `NSLOCTEXT("area","id","Save")` down to `"Save"` for display.
+	 */
+	formatValue?: (value: CellValue, ctx: CellContext) => string;
+
+	/**
+	 * Commit-time parser for editor input. Receives the raw editor text plus the
+	 * previous raw cell value, so structural metadata (e.g., an NSLOCTEXT
+	 * wrapper) can be preserved across edits.
+	 *
+	 * Only runs on editor commit — NOT on paste, autofill, delete, or external
+	 * writes. Those keep writing literal values.
+	 *
+	 * Should be idempotent: committing an unchanged formatted text should
+	 * return a value `===`-equal to `ctx.previousValue` so the no-op
+	 * short-circuit in `commitCellEdit` engages.
+	 *
+	 * **Required when `formatValue` is set** — without it, committing unchanged
+	 * formatted text would overwrite the raw wrapper. A development-mode
+	 * console warning fires if this invariant is violated.
+	 */
+	parseValue?: (text: string, ctx: ParseValueContext) => CellValue;
+
+	/**
+	 * Replace the inner `<span class="se-cell__text">` with custom JSX. The
+	 * outer `<div class="se-cell">` — which owns selection, pinning, search
+	 * highlight, aria, and mouse events — is always preserved, so custom
+	 * content cannot break grid invariants.
+	 *
+	 * The returned JSX inherits the cell's CSS (flex centering, `overflow:
+	 * hidden; white-space: nowrap; padding: 0 6px`). Override as needed.
+	 *
+	 * For expensive content, check `ctx.isEditing` and return `null` when the
+	 * editor overlay is active.
+	 */
+	renderCell?: (ctx: CellRenderContext) => JSX.Element;
+
+	/**
+	 * Override the cell's `title` tooltip.
+	 * - `undefined` → fall back to the formatted text (current default behaviour)
+	 * - `""` → suppress the tooltip entirely
+	 * - any other string → use it verbatim
+	 */
+	getCellTitle?: (value: CellValue, ctx: CellContext) => string | undefined;
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────

@@ -9,13 +9,16 @@ export {
 
 export type {
 	CellAddress,
+	CellContext,
 	CellMutation,
 	CellRange,
+	CellRenderContext,
 	CellValue,
 	ClipboardPayload,
 	ColumnDef,
 	EditModeState,
 	FormulaEngineConfig,
+	ParseValueContext,
 	RowReorderMutation,
 	ScrollPosition,
 	Selection,

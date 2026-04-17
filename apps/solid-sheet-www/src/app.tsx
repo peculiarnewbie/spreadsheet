@@ -478,6 +478,87 @@ function CrossSheetDemo() {
   );
 }
 
+// ── Custom Cells demo (column-level renderCell / formatValue / parseValue / getCellTitle) ──
+
+// Minimal NSLOCTEXT parser for the demo — matches the Unreal format:
+//   NSLOCTEXT("area", "id", "actual text")
+// Returns null if the raw value doesn't match the shape.
+interface LocParts {
+  area: string;
+  id: string;
+  text: string;
+}
+const NSLOC_RE =
+  /^NSLOCTEXT\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*\)$/;
+function parseNSLoc(raw: CellValue): LocParts | null {
+  if (typeof raw !== "string") return null;
+  const m = raw.match(NSLOC_RE);
+  if (!m) return null;
+  return { area: m[1] ?? "", id: m[2] ?? "", text: m[3] ?? "" };
+}
+function serializeNSLoc(parts: LocParts): string {
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `NSLOCTEXT("${esc(parts.area)}","${esc(parts.id)}","${esc(parts.text)}")`;
+}
+
+function CustomRenderingSheet() {
+  const columns: ColumnDef[] = [
+    { id: "label", header: "Label", width: 160, editable: true },
+    {
+      id: "localized",
+      header: "Localized Text",
+      width: 220,
+      editable: true,
+      // Display only the inner human-readable text.
+      formatValue: (raw) => parseNSLoc(raw)?.text ?? (raw == null ? "" : String(raw)),
+      // On commit, rewrap using previousValue's area + id so structural metadata survives edits.
+      parseValue: (text, { previousValue }) => {
+        const prev = parseNSLoc(previousValue);
+        if (!prev) {
+          // Previous value wasn't a well-formed NSLOCTEXT — default to an empty wrapper.
+          return serializeNSLoc({ area: "menu", id: "unknown", text });
+        }
+        return serializeNSLoc({ ...prev, text });
+      },
+      // Hover shows the structural info.
+      getCellTitle: (raw) => {
+        const parts = parseNSLoc(raw);
+        return parts ? `area: ${parts.area} · id: ${parts.id}` : undefined;
+      },
+    },
+    {
+      id: "status",
+      header: "Status",
+      width: 140,
+      editable: true,
+      // No formatValue/parseValue — raw string works for editing.
+      // renderCell shows a colored pill.
+      renderCell: ({ value, isEditing }) => {
+        if (isEditing) return null;
+        const variant =
+          value === "active" || value === "pending" || value === "error"
+            ? value
+            : "unknown";
+        return (
+          <span class={`status-badge status-badge--${variant}`}>
+            {value == null ? "—" : String(value)}
+          </span>
+        );
+      },
+    },
+  ];
+
+  const data: CellValue[][] = [
+    ["Save Button", `NSLOCTEXT("menu","btn.save","Save")`, "active"],
+    ["Cancel Button", `NSLOCTEXT("menu","btn.cancel","Cancel")`, "pending"],
+    ["Delete Button", `NSLOCTEXT("menu","btn.delete","Delete")`, "error"],
+    ["File / Open", `NSLOCTEXT("menu","file.open","Open...")`, "active"],
+    ["File / Save As", `NSLOCTEXT("menu","file.saveas","Save As...")`, "pending"],
+  ];
+
+  return <Sheet data={data} columns={columns} />;
+}
+
 // ── Demo metadata ───────────────────────────────────────────
 
 const DEMOS = [
@@ -663,6 +744,21 @@ const DEMOS = [
       "=Data!A1",
       "workbook coordinator",
       "live sync",
+    ],
+    tall: false,
+  },
+  {
+    id: "custom-rendering",
+    tab: "Custom Cells",
+    title: "Custom Cell Rendering",
+    desc: "Four column-level hooks: formatValue (display transform), parseValue (commit transform, preserves hidden metadata), renderCell (custom JSX), getCellTitle (hover). The Localized column stores the full NSLOCTEXT(...) wrapper but displays just the inner text; edits preserve area/id. The Status column renders colored pills via renderCell.",
+    badges: [
+      "formatValue",
+      "parseValue",
+      "renderCell",
+      "getCellTitle",
+      "NSLOCTEXT round-trip",
+      "status pills",
     ],
     tall: false,
   },
@@ -890,6 +986,9 @@ function DemoPlayground() {
                 </Match>
                 <Match when={activeIdx() === 14}>
                   <CrossSheetDemo />
+                </Match>
+                <Match when={activeIdx() === 15}>
+                  <CustomRenderingSheet />
                 </Match>
               </Switch>
             </div>

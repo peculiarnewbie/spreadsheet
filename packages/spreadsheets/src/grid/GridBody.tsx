@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import type { CellAddress, CellValue, ColumnDef } from "../types";
 import { useSheetCustomization } from "../customization";
+import { defaultFormatCellValue } from "../core/formatting";
 import GridCell from "./GridCell";
 
 function addressMatchesCurrent(addr: CellAddress, current: CellAddress | null): boolean {
@@ -21,6 +22,10 @@ interface GridBodyProps {
 	/** Total row count for sizing. */
 	totalRows: number;
 	getDisplayValue: (row: number, col: number) => CellValue;
+	/** Raw cell value (pre-formula-eval, pre-formatValue). Used for renderCell + title hooks. */
+	getRawValue: (row: number, col: number) => CellValue;
+	/** Visual address of the currently-editing cell (if any). Used to set `isEditing` on custom renderers. */
+	editingAddress: CellAddress | null;
 	onCellMouseDown: (addr: CellAddress, event: MouseEvent) => void;
 	onCellMouseEnter?: (addr: CellAddress, event: MouseEvent) => void;
 	onRowHeaderMouseDown?: (row: number, event: MouseEvent) => void;
@@ -85,10 +90,23 @@ export default function GridBody(props: GridBodyProps) {
 							<For each={props.columns}>
 								{(col, colIdx) => {
 									const addr = (): CellAddress => ({ row: rowIdx, col: colIdx() });
+									const rawValue = () => props.getRawValue(rowIdx, colIdx());
+									const displayValue = () => props.getDisplayValue(rowIdx, colIdx());
+									const formattedText = () =>
+										col.formatValue
+											? col.formatValue(displayValue(), { row: rowIdx, col: colIdx() })
+											: defaultFormatCellValue(displayValue());
+									const titleOverride = () =>
+										col.getCellTitle?.(rawValue(), { row: rowIdx, col: colIdx() });
+									const isEditing = () =>
+										props.editingAddress?.row === rowIdx &&
+										props.editingAddress?.col === colIdx();
 
 									return (
 										<GridCell
-											displayValue={props.getDisplayValue(rowIdx, colIdx())}
+											rawValue={rawValue()}
+											formattedText={formattedText()}
+											row={rowIdx}
 											width={getColWidth(col)}
 											height={props.rowHeight}
 											colIndex={colIdx()}
@@ -97,6 +115,9 @@ export default function GridBody(props: GridBodyProps) {
 											isLastPinned={colIdx() === props.lastPinnedIndex}
 											searchMatch={props.searchMatchSet.has(`${rowIdx},${colIdx()}`)}
 											searchCurrent={addressMatchesCurrent(addr(), props.searchCurrentAddress)}
+											isEditing={isEditing()}
+											{...(titleOverride() !== undefined ? { title: titleOverride() as string } : {})}
+											{...(col.renderCell ? { renderCell: col.renderCell } : {})}
 											{...(customization?.getCellClass ? { customClass: customization.getCellClass(rowIdx, colIdx()) } : {})}
 											onMouseDown={(e) => props.onCellMouseDown(addr(), e)}
 											onMouseEnter={(e) => props.onCellMouseEnter?.(addr(), e)}
