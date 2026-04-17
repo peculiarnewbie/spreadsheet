@@ -10,9 +10,10 @@
     "deploy": "vite build && wrangler deploy"
   },
   "dependencies": {
-    "peculiar-sheets": "workspace:*",
     "hyperformula": "^3.0.0",
-    "solid-js": "^1.9.11"
+    "peculiar-sheets": "workspace:*",
+    "solid-js": "^1.9.11",
+    "sugar-high": "^1.1.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",

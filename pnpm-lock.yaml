@@ -48,6 +48,9 @@ importers:
       solid-js:
         specifier: ^1.9.11
         version: 1.9.12
+      sugar-high:
+        specifier: ^1.1.0
+        version: 1.1.0
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.0.0
@@ -2934,6 +2937,9 @@ packages:
   strip-json-comments@5.0.3:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
+
+  sugar-high@1.1.0:
+    resolution: {integrity: sha512-pL68G9H5VgK5z5aRAp8Yl4+obwbfEpr4BCCdO9V9JrWTFQiPMuN2GKxl9Vn/oxzkcS8TOTFFNti3LXe0UWX2Yw==}
 
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
@@ -6090,6 +6096,8 @@ snapshots:
     optional: true
 
   strip-json-comments@5.0.3: {}
+
+  sugar-high@1.1.0: {}
 
   supports-color@10.2.2: {}
 

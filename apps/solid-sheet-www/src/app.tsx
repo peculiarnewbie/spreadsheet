@@ -1,4 +1,5 @@
 import { createSignal, onMount, onCleanup, Switch, Match } from "solid-js";
+import { highlight } from "sugar-high";
 import { createStore } from "solid-js/store";
 import HyperFormula from "hyperformula";
 import {
@@ -774,18 +775,18 @@ function SiteHeader() {
           peculiar-sheets
         </a>
         <nav class="site-header-nav">
-          <a href="#features" class="nav-section-link">
-            Features
-          </a>
           <a href="#demos" class="nav-section-link">
             Demos
+          </a>
+          <a href="#features" class="nav-section-link">
+            Features
           </a>
           <a href="#quickstart" class="nav-section-link">
             Quick Start
           </a>
           <span class="nav-divider" aria-hidden="true" />
           <a
-            href="https://github.com/peculiarnewbie/spreadsheets"
+            href="https://github.com/peculiarnewbie/peculiar-sheets"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -843,28 +844,29 @@ function HeroSection() {
 
 const FEATURES = [
   {
-    title: "Signals, not state",
-    desc: "Every cell is a fine-grained signal. Updates touch only what changed — no reconciliation, no diffing, no wasted renders.",
+    claim: "Every cell is a signal.",
+    line: "Edit one cell — only that cell re-renders. No VDOM, no reconcile, no wasted work downstream.",
+    chip: "SolidJS primitives",
   },
   {
-    title: "200K+ cells",
-    desc: "Row virtualization via @tanstack/solid-virtual. 10,000 rows scroll and edit without a hitch.",
+    claim: "Round-trip rich values.",
+    line: "Four column hooks handle display, parse, render, and hover. Store NSLOCTEXT — show just the inner text. Edits preserve every byte of metadata.",
+    chip: "formatValue · parseValue · renderCell · getCellTitle",
   },
   {
-    title: "400+ formulas",
-    desc: "Optional HyperFormula engine with =SUM, =VLOOKUP, cross-sheet refs. Or skip it — not a hard dependency.",
+    claim: "One sort, three semantics.",
+    line: "View-sort without touching the data. Mutate in place for export. Or delegate to the host for server-side sorting.",
+    chip: 'sortMode: "view" | "mutation" | "external"',
   },
   {
-    title: "Excel clipboard",
-    desc: "Copy/paste as TSV. Data round-trips with Excel and Google Sheets. Cut, copy, and paste all work.",
+    claim: "Refs survive row ops.",
+    line: "Insert, delete, reorder — HyperFormula follows along. Ranges expand, references shift, nothing breaks silently.",
+    chip: "=SUM(B1:B3)  →  =SUM(B1:B4)",
   },
   {
-    title: "Smart autofill",
-    desc: "Drag the fill handle — series detection turns [1, 2, 3] into [4, 5, 6]. Formulas shift references automatically.",
-  },
-  {
-    title: "Full undo/redo",
-    desc: "Ctrl+Z/Y with batch awareness. Paste 100 cells? One undo step. Selection state restores too.",
+    claim: "Sheets that talk to each other.",
+    line: "One coordinator, many sheets. Cross-sheet references like =Data!B1 sync live across every instance in the workbook.",
+    chip: "createWorkbookCoordinator()",
   },
 ];
 
@@ -872,14 +874,23 @@ function FeaturesSection() {
   return (
     <section class="features-section" id="features">
       <div class="section-wrap">
-        <div class="features-grid">
-          {FEATURES.map((f) => (
-            <div class="feature-card">
-              <h3 class="feature-title">{f.title}</h3>
-              <p class="feature-desc">{f.desc}</p>
-            </div>
+        <p class="features-kicker">
+          <span class="features-kicker-mark">§</span> what makes it peculiar
+        </p>
+        <ol class="features-index">
+          {FEATURES.map((f, i) => (
+            <li class="feature-row">
+              <span class="feature-num" aria-hidden="true">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div class="feature-body">
+                <h3 class="feature-claim">{f.claim}</h3>
+                <p class="feature-line">{f.line}</p>
+              </div>
+              <code class="feature-chip">{f.chip}</code>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   );
@@ -1038,7 +1049,7 @@ export default () => <Sheet data={data} columns={columns} />;`;
             <span class="code-filename">App.tsx</span>
           </div>
           <pre>
-            <code>{code}</code>
+            <code class="sh" innerHTML={highlight(code)} />
           </pre>
         </div>
       </div>
@@ -1060,7 +1071,7 @@ export default function App() {
       </main>
       <footer class="site-footer">
         <a
-          href="https://github.com/peculiarnewbie/spreadsheets"
+          href="https://github.com/peculiarnewbie/peculiar-sheets"
           target="_blank"
           rel="noopener noreferrer"
         >
