@@ -334,39 +334,6 @@ a:hover {
   opacity: 0.35;
 }
 
-/* ── Hero sheet ───────────────────────────────────────────── */
-
-.hero-sheet-area {
-  margin-top: 2.5rem;
-}
-
-.hero-sheet-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-soft);
-  margin: 0 0 0.625rem;
-  text-align: center;
-  opacity: 0.7;
-}
-
-.hero-sheet-wrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  background: var(--sheet-bg);
-  box-shadow: var(--shadow-card);
-  transition:
-    border-color 0.35s ease,
-    border-radius 0.35s ease,
-    box-shadow 0.35s ease;
-}
-
-.hero-sheet-inner {
-  height: 240px;
-  position: relative;
-}
-
-
 /* ══════════════════════════════════════════════════════════════
    FEATURES
    ══════════════════════════════════════════════════════════════ */
@@ -670,7 +637,6 @@ a:hover {
   );
 }
 
-.hero-sheet-wrap,
 .demo-sheet-wrap {
   background: #12121e;
 }
@@ -721,10 +687,6 @@ a:hover {
 @media (max-width: 640px) {
   .hero-title {
     font-size: 1.75rem;
-  }
-
-  .hero-sheet-inner {
-    height: 200px;
   }
 
   .features-grid {

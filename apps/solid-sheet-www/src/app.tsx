@@ -37,34 +37,6 @@ function InstallCommand() {
 
 // ── Hero sheet (live formulas in the hero) ──────────────────
 
-function HeroSheet() {
-  const columns: ColumnDef[] = [
-    { id: "a", header: "Team", width: 120, editable: true },
-    { id: "b", header: "Q1", width: 85, editable: true },
-    { id: "c", header: "Q2", width: 85, editable: true },
-    { id: "d", header: "Total", width: 95, editable: true },
-  ];
-
-  const data: CellValue[][] = [
-    ["Engineering", 48, 52, "=B1+C1"],
-    ["Design", 32, 35, "=B2+C2"],
-    ["Marketing", 28, 31, "=B3+C3"],
-    [null, null, "Sum", "=SUM(D1:D3)"],
-  ];
-
-  const hf = HyperFormula.buildEmpty({ licenseKey: "gpl-v3" });
-  const sheetName = hf.addSheet("hero");
-  const sheetId = hf.getSheetId(sheetName)!;
-
-  return (
-    <Sheet
-      data={data}
-      columns={columns}
-      formulaEngine={{ instance: hf, sheetId, sheetName }}
-    />
-  );
-}
-
 // ── Sheet-only demo components ──────────────────────────────
 
 function BasicSheet() {
@@ -862,17 +834,6 @@ function HeroSection() {
             <span>GPL-3.0</span>
           </div>
         </div>
-
-        <div class="hero-sheet-area">
-          <p class="hero-sheet-label">
-            Try it — edit a number and watch the totals update
-          </p>
-          <div class="hero-sheet-wrap">
-            <div class="hero-sheet-inner">
-              <HeroSheet />
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -911,7 +872,6 @@ function FeaturesSection() {
   return (
     <section class="features-section" id="features">
       <div class="section-wrap">
-        <h2 class="section-heading">Why peculiar-sheets</h2>
         <div class="features-grid">
           {FEATURES.map((f) => (
             <div class="feature-card">
@@ -1094,8 +1054,8 @@ export default function App() {
       <SiteHeader />
       <main>
         <HeroSection />
-        <FeaturesSection />
         <DemoPlayground />
+        <FeaturesSection />
         <QuickStart />
       </main>
       <footer class="site-footer">
