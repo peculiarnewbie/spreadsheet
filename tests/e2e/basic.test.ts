@@ -17,6 +17,37 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 describe("basic", () => {
 	let sh: Stagehand;
 
+	async function getActiveEditorState() {
+		return getPage().evaluate(() => {
+			const active = document.activeElement;
+			if (!(active instanceof HTMLInputElement)) return null;
+			return {
+				value: active.value,
+				selectionStart: active.selectionStart,
+				selectionEnd: active.selectionEnd,
+			};
+		});
+	}
+
+	async function dispatchEditorArrowKey(key: "ArrowLeft" | "ArrowRight") {
+		return getPage().evaluate((pressedKey: "ArrowLeft" | "ArrowRight") => {
+			const input = document.querySelector(".se-cell-editor");
+			if (!(input instanceof HTMLInputElement)) return null;
+
+			const event = new KeyboardEvent("keydown", {
+				key: pressedKey,
+				code: pressedKey,
+				bubbles: true,
+				cancelable: true,
+			});
+			input.dispatchEvent(event);
+
+			return {
+				editorStillMounted: document.querySelector(".se-cell-editor") instanceof HTMLInputElement,
+			};
+		}, key);
+	}
+
 	beforeAll(async () => {
 		sh = await getStagehand();
 		await navigateTo(sh, "/basic");
@@ -129,5 +160,49 @@ describe("basic", () => {
 			() => (window as any).__SHEET_CONTROLLER__?.getSelection(),
 		);
 		expect(sel?.anchor.row).toBe(2);
+	});
+
+	it("keeps left/right arrows inside the cell editor", async () => {
+		const initialValue = await getCellValue(sh, 0, 0);
+		const initialText = initialValue == null ? "" : String(initialValue);
+
+		await clickCell(sh, 0, 0);
+		await press(sh, "Enter");
+
+		let editor = await getActiveEditorState();
+		expect(editor?.value).toBe(initialText);
+		expect(editor?.selectionStart).toBe(initialText.length);
+		expect(editor?.selectionEnd).toBe(initialText.length);
+
+		let arrowResult = await dispatchEditorArrowKey("ArrowLeft");
+		expect(arrowResult?.editorStillMounted).toBe(true);
+
+		editor = await getActiveEditorState();
+		expect(editor?.value).toBe(initialText);
+
+		let selection = await getPage().evaluate(
+			() => (window as any).__SHEET_CONTROLLER__?.getSelection(),
+		);
+		expect(selection?.anchor).toEqual({ row: 0, col: 0 });
+
+		await press(sh, "Escape");
+		await doubleClickCell(sh, 0, 0);
+
+		editor = await getActiveEditorState();
+		expect(editor?.selectionStart).toBe(0);
+		expect(editor?.selectionEnd).toBe(initialText.length);
+
+		arrowResult = await dispatchEditorArrowKey("ArrowRight");
+		expect(arrowResult?.editorStillMounted).toBe(true);
+
+		editor = await getActiveEditorState();
+		expect(editor?.value).toBe(initialText);
+
+		selection = await getPage().evaluate(
+			() => (window as any).__SHEET_CONTROLLER__?.getSelection(),
+		);
+		expect(selection?.anchor).toEqual({ row: 0, col: 0 });
+
+		await press(sh, "Escape");
 	});
 });

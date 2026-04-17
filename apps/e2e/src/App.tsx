@@ -20,6 +20,7 @@ import SortMutationFormulasPage from "./routes/sort-mutation-formulas";
 import FormulaRowsPage from "./routes/formula-rows";
 import FormulaRowDeletePage from "./routes/formula-row-delete";
 import CrossSheetPage from "./routes/cross-sheet";
+import CustomRenderingPage from "./routes/custom-rendering";
 
 const rootRoute = createRootRoute({
 	component: () => <Outlet />,
@@ -46,6 +47,7 @@ const indexRoute = createRoute({
 				<li><a href="/formula-rows">Formula + Row Ops</a></li>
 				<li><a href="/formula-row-delete">Formula + Row Delete</a></li>
 				<li><a href="/cross-sheet">Cross Sheet</a></li>
+				<li><a href="/custom-rendering">Custom Rendering</a></li>
 			</ul>
 		</nav>
 	),
@@ -141,6 +143,12 @@ const crossSheetRoute = createRoute({
 	component: CrossSheetPage,
 });
 
+const customRenderingRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/custom-rendering",
+	component: CustomRenderingPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	indexRoute,
 	basicRoute,
@@ -158,6 +166,7 @@ const routeTree = rootRoute.addChildren([
 	formulaRowsRoute,
 	formulaRowDeleteRoute,
 	crossSheetRoute,
+	customRenderingRoute,
 ]);
 
 const router = createRouter({ routeTree });

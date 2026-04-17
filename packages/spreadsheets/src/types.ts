@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import type { WorkbookSheetBinding } from "./workbook/types";
 
 // ── Cell Primitives ──────────────────────────────────────────────────────────
@@ -40,11 +41,43 @@ export interface SortState {
 
 // ── Column Definitions ───────────────────────────────────────────────────────
 
+/**
+ * Base context passed to every column-level hook.
+ * `row` is the physical (post-sort) row index; `col` is the column index.
+ */
+export interface CellContext {
+	row: number;
+	col: number;
+}
+
+/** Context for `ColumnDef.parseValue`. */
+export interface ParseValueContext extends CellContext {
+	/** The raw cell value immediately before this commit — read fresh from the store. */
+	previousValue: CellValue;
+}
+
+/** Context for `ColumnDef.renderCell`. */
+export interface CellRenderContext extends CellContext {
+	/** Raw stored value (pre-format, pre-formula-eval for non-formula cells). */
+	value: CellValue;
+	/** Result of `formatValue` (or the default stringifier) — always available. */
+	formattedText: string;
+	/** True when this column / sheet is read-only. */
+	readOnly: boolean;
+	/**
+	 * True while the CellEditor is overlaying this cell (z-index 20). Heavy
+	 * renderers should return `null` or a cheap fallback here; the editor input
+	 * obscures the cell content, so expensive work would be wasted.
+	 */
+	isEditing: boolean;
+}
+
 export interface ColumnDef {
 	id: string;
 	header: string;
 	width?: number;
 	minWidth?: number;
+	maxWidth?: number;
 	resizable?: boolean;
 	editable?: boolean;
 	pinned?: "left" | undefined;
@@ -60,6 +93,58 @@ export interface ColumnDef {
 		modelRow: number,
 		columnId: string,
 	) => string | number | boolean | null;
+
+	// ── Custom rendering / value transforms ──────────────────────────────────
+	// All optional. See docs/custom-cells.md or README for end-to-end examples.
+
+	/**
+	 * Transform a raw CellValue into text for cell rendering AND editor seeding.
+	 * Does NOT affect the formula bar, search matching, sort keys, or clipboard
+	 * output — those continue to operate on raw/display values.
+	 *
+	 * Example: strip `NSLOCTEXT("area","id","Save")` down to `"Save"` for display.
+	 */
+	formatValue?: (value: CellValue, ctx: CellContext) => string;
+
+	/**
+	 * Commit-time parser for editor input. Receives the raw editor text plus the
+	 * previous raw cell value, so structural metadata (e.g., an NSLOCTEXT
+	 * wrapper) can be preserved across edits.
+	 *
+	 * Only runs on editor commit — NOT on paste, autofill, delete, or external
+	 * writes. Those keep writing literal values.
+	 *
+	 * Should be idempotent: committing an unchanged formatted text should
+	 * return a value `===`-equal to `ctx.previousValue` so the no-op
+	 * short-circuit in `commitCellEdit` engages.
+	 *
+	 * **Required when `formatValue` is set** — without it, committing unchanged
+	 * formatted text would overwrite the raw wrapper. A development-mode
+	 * console warning fires if this invariant is violated.
+	 */
+	parseValue?: (text: string, ctx: ParseValueContext) => CellValue;
+
+	/**
+	 * Replace the inner `<span class="se-cell__text">` with custom JSX. The
+	 * outer `<div class="se-cell">` — which owns selection, pinning, search
+	 * highlight, aria, and mouse events — is always preserved, so custom
+	 * content cannot break grid invariants.
+	 *
+	 * The returned JSX inherits the cell's CSS (flex centering, `overflow:
+	 * hidden; white-space: nowrap; padding: 0 6px`). Override as needed.
+	 *
+	 * For expensive content, check `ctx.isEditing` and return `null` when the
+	 * editor overlay is active.
+	 */
+	renderCell?: (ctx: CellRenderContext) => JSX.Element;
+
+	/**
+	 * Override the cell's `title` tooltip.
+	 * - `undefined` → fall back to the formatted text (current default behaviour)
+	 * - `""` → suppress the tooltip entirely
+	 * - any other string → use it verbatim
+	 */
+	getCellTitle?: (value: CellValue, ctx: CellContext) => string | undefined;
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -122,6 +207,27 @@ export interface ScrollPosition {
 	visibleColRange: [number, number];
 }
 
+// ── Sizing ───────────────────────────────────────────────────────────────────
+
+export interface SheetSizingState {
+	columnWidths: Map<string, number>;
+	rowHeights: Map<number, number>;
+}
+
+export type ResizeAxis = "column" | "row";
+
+export type ResizeMode = "onEnd" | "onChange";
+
+export interface ResizeSessionState {
+	axis: ResizeAxis;
+	targetId: string | number;
+	startPointerOffset: number;
+	startSize: number;
+	currentDelta: number;
+	previewSize: number;
+	isActive: boolean;
+}
+
 // ── Sheet Customization ─────────────────────────────────────────────────────
 // Provided via SolidJS context so inner components can consume directly
 // without prop drilling through Sheet → Grid → GridBody → GridCell.
@@ -162,6 +268,8 @@ export interface SheetProps {
 	rowCount?: number;
 	/** Row height in px (default 28). */
 	rowHeight?: number;
+	/** Resize commit timing (`onEnd` by default). */
+	resizeMode?: ResizeMode;
 	/** When true, no cell editing is allowed. */
 	readOnly?: boolean;
 	/** Optional HyperFormula integration. */
@@ -180,7 +288,12 @@ export interface SheetProps {
 	onEditModeChange?: (state: EditModeState | null) => void;
 	onClipboard?: (payload: ClipboardPayload) => void;
 	onScroll?: (position: ScrollPosition) => void;
+	columnSizing?: Record<string, number>;
+	onColumnSizingChange?: (next: Record<string, number>) => void;
+	rowSizing?: Record<number, number>;
+	onRowSizingChange?: (next: Record<number, number>) => void;
 	onColumnResize?: (columnId: string, width: number) => void;
+	onRowResize?: (rowId: number, height: number) => void;
 	onSort?: (columnId: string, direction: SortDirection | null) => void;
 	onSortChange?: (state: SortState | null) => void;
 	/** Called when rows are inserted. The host should update its data array accordingly. */

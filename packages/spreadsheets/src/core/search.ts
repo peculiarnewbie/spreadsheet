@@ -1,12 +1,7 @@
 import type { CellAddress, CellValue } from "../types";
+import { defaultFormatCellValue } from "./formatting";
 
 // ── Search Logic ────────────────────────────────────────────────────────────
-
-function formatCellValueForSearch(value: CellValue): string {
-	if (value === null || value === undefined) return "";
-	if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-	return String(value);
-}
 
 /**
  * Scans all cells in the grid and returns addresses of cells whose display
@@ -26,7 +21,7 @@ export function findMatches(
 
 	for (let row = 0; row < rowCount; row++) {
 		for (let col = 0; col < colCount; col++) {
-			const display = formatCellValueForSearch(getDisplayValue(row, col));
+			const display = defaultFormatCellValue(getDisplayValue(row, col));
 			if (display.toLowerCase().includes(lowerQuery)) {
 				matches.push({ row, col });
 			}

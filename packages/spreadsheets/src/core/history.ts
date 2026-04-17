@@ -19,6 +19,18 @@ interface StoredRowReorder {
 	newOrder: number[];
 }
 
+interface StoredColumnResize {
+	columnId: string;
+	oldWidth: number;
+	newWidth: number;
+}
+
+interface StoredRowResize {
+	rowId: number;
+	oldHeight: number;
+	newHeight: number;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type HistoryEntry =
@@ -38,6 +50,18 @@ export type HistoryEntry =
 	| {
 		type: "row-reorder";
 		rowReorder: StoredRowReorder;
+		selectionBefore: Selection;
+		selectionAfter: Selection;
+	}
+	| {
+		type: "column-resize";
+		columnResize: StoredColumnResize;
+		selectionBefore: Selection;
+		selectionAfter: Selection;
+	}
+	| {
+		type: "row-resize";
+		rowResize: StoredRowResize;
 		selectionBefore: Selection;
 		selectionAfter: Selection;
 	};
@@ -124,6 +148,38 @@ export function pushRowReorderHistory(
 	});
 }
 
+export function pushColumnResizeHistory(
+	history: HistoryStack,
+	columnResize: StoredColumnResize,
+	selectionBefore: Selection,
+	selectionAfter: Selection,
+): HistoryStack {
+	if (columnResize.oldWidth === columnResize.newWidth) return history;
+
+	return pushEntry(history, {
+		type: "column-resize",
+		columnResize: { ...columnResize },
+		selectionBefore,
+		selectionAfter,
+	});
+}
+
+export function pushRowResizeHistory(
+	history: HistoryStack,
+	rowResize: StoredRowResize,
+	selectionBefore: Selection,
+	selectionAfter: Selection,
+): HistoryStack {
+	if (rowResize.oldHeight === rowResize.newHeight) return history;
+
+	return pushEntry(history, {
+		type: "row-resize",
+		rowResize: { ...rowResize },
+		selectionBefore,
+		selectionAfter,
+	});
+}
+
 // ── Undo / Redo ──────────────────────────────────────────────────────────────
 
 /** Info about what structural row change was performed during undo/redo. */
@@ -140,6 +196,8 @@ export interface UndoResult {
 	rowOp?: RowOperation;
 	rowChange?: UndoRedoRowChange;
 	rowReorder?: RowReorderMutation;
+	columnResize?: { columnId: string; width: number };
+	rowResize?: { rowId: number; height: number };
 }
 
 function buildIndexOrder(oldOrder: number[], newOrder: number[]): number[] {
@@ -235,6 +293,28 @@ export function undo(history: HistoryStack): UndoResult | null {
 					"undo",
 				),
 			};
+
+		case "column-resize":
+			return {
+				history: nextHistory,
+				mutations: [],
+				selection: entry.selectionBefore,
+				columnResize: {
+					columnId: entry.columnResize.columnId,
+					width: entry.columnResize.oldWidth,
+				},
+			};
+
+		case "row-resize":
+			return {
+				history: nextHistory,
+				mutations: [],
+				selection: entry.selectionBefore,
+				rowResize: {
+					rowId: entry.rowResize.rowId,
+					height: entry.rowResize.oldHeight,
+				},
+			};
 	}
 }
 
@@ -287,6 +367,28 @@ export function redo(history: HistoryStack): UndoResult | null {
 				mutations: [],
 				selection: entry.selectionAfter,
 				rowReorder: materializeRowReorder(entry.rowReorder, "redo"),
+			};
+
+		case "column-resize":
+			return {
+				history: nextHistory,
+				mutations: [],
+				selection: entry.selectionAfter,
+				columnResize: {
+					columnId: entry.columnResize.columnId,
+					width: entry.columnResize.newWidth,
+				},
+			};
+
+		case "row-resize":
+			return {
+				history: nextHistory,
+				mutations: [],
+				selection: entry.selectionAfter,
+				rowResize: {
+					rowId: entry.rowResize.rowId,
+					height: entry.rowResize.newHeight,
+				},
 			};
 	}
 }
