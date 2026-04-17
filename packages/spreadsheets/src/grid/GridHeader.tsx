@@ -13,7 +13,6 @@ interface GridHeaderProps {
 	pinnedLeftOffsets: number[];
 	lastPinnedIndex: number;
 	onColumnResize: (columnId: string, width: number) => void;
-	onSort: (columnId: string) => void;
 	onColumnHeaderMouseDown?: (col: number, event: MouseEvent) => void;
 }
 
@@ -168,16 +167,17 @@ export default function GridHeader(props: GridHeaderProps) {
 									}}
 									role="columnheader"
 									aria-colindex={index() + 1}
-									style={{
-										width: `${getColWidth(col)}px`,
-										"min-width": `${getColWidth(col)}px`,
-										height: `${HEADER_HEIGHT}px`,
-										left: isPinned() ? `${props.pinnedLeftOffsets?.[index()] ?? 0}px` : undefined,
-									}}
-									onMouseDown={(e) => props.onColumnHeaderMouseDown?.(index(), e)}
-								>
-									{columnIndexToLetters(index())}
-								</div>
+								style={{
+									width: `${getColWidth(col)}px`,
+									"min-width": `${getColWidth(col)}px`,
+									height: `${HEADER_HEIGHT}px`,
+									left: isPinned() ? `${props.pinnedLeftOffsets?.[index()] ?? 0}px` : undefined,
+								}}
+								data-col-index={index()}
+								onMouseDown={(e) => props.onColumnHeaderMouseDown?.(index(), e)}
+							>
+								{columnIndexToLetters(index())}
+							</div>
 							);
 						}}
 					</For>
@@ -263,11 +263,8 @@ export default function GridHeader(props: GridHeaderProps) {
 									left: isPinned() ? `${props.pinnedLeftOffsets?.[index()] ?? 0}px` : undefined,
 									cursor: isSortable ? "pointer" : undefined,
 								}}
-								onClick={() => {
-									if (isSortable) {
-										props.onSort(col.id);
-									}
-								}}
+								data-col-index={index()}
+								onMouseDown={(e) => props.onColumnHeaderMouseDown?.(index(), e)}
 							>
 								<span class="se-header-cell__label">
 									{col.header}{getSortIndicator(col)}

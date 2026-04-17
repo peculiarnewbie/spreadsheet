@@ -3,6 +3,7 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import {
 	clickCell,
 	clickColumnHeader,
+	clickContextMenuItem,
 	doubleClickCell,
 	focusGrid,
 	getCellText,
@@ -15,6 +16,7 @@ import {
 	getStagehand,
 	navigateTo,
 	press,
+	rightClickColumnHeader,
 	typeIntoCell,
 } from "./setup";
 
@@ -31,9 +33,12 @@ describe("sorting", () => {
 			window.__SORT_INTENTS__ = [];
 		});
 
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort Z-A");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Clear sort");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Alice");
 
@@ -48,9 +53,27 @@ describe("sorting", () => {
 		]);
 	});
 
-	it("view sort reorders visible rows, shows backing row numbers, and tooltips view row numbers", async () => {
+	it("clicking a column header selects the full column", async () => {
 		await navigateTo(sh, "/sort-view");
 		await clickColumnHeader(sh, "Score");
+
+		const selection = await getPage().evaluate(
+			() => window.__SHEET_CONTROLLER__?.getSelection(),
+		);
+		expect(selection?.ranges).toEqual([
+			{
+				start: { row: 0, col: 3 },
+				end: { row: 3, col: 3 },
+			},
+		]);
+		expect(selection?.anchor).toEqual({ row: 0, col: 3 });
+		expect(selection?.focus).toEqual({ row: 3, col: 3 });
+	});
+
+	it("view sort reorders visible rows, shows backing row numbers, and tooltips view row numbers", async () => {
+		await navigateTo(sh, "/sort-view");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Dave");
 		expect(await getRowHeaderText(sh, 0)).toBe("4");
@@ -61,11 +84,14 @@ describe("sorting", () => {
 		expect(data[3]?.[0]).toBe("Dave");
 	});
 
-	it("third click clears a view sort back to the normal row order", async () => {
+	it("clearing a view sort restores the normal row order", async () => {
 		await navigateTo(sh, "/sort-view");
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort Z-A");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Clear sort");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Alice");
 		expect(await getRowHeaderText(sh, 0)).toBe("1");
@@ -76,7 +102,8 @@ describe("sorting", () => {
 
 	it("editing a view-sorted row mutates the backing row and reports viewAddress", async () => {
 		await navigateTo(sh, "/sort-view");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
 		await doubleClickCell(sh, 0, 0);
 		await typeIntoCell(sh, "Daphne");
 
@@ -93,22 +120,30 @@ describe("sorting", () => {
 		expect(typeof mutations[0]?.rowId).toBe("number");
 	});
 
-	it("keeps selection attached to the same backing row when view sort direction changes", async () => {
+	it("keeps the selected column active when view sort direction changes", async () => {
 		await navigateTo(sh, "/sort-view");
 		await clickColumnHeader(sh, "Score");
-		await clickCell(sh, 0, 0);
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort Z-A");
 
 		const selection = await getPage().evaluate(
 			() => window.__SHEET_CONTROLLER__?.getSelection(),
 		);
-		expect(selection?.anchor).toEqual({ row: 3, col: 0 });
-		expect(await getCellText(sh, 3, 0)).toBe("Dave");
+		const range = selection?.ranges?.[0];
+		expect(range).toBeDefined();
+		expect(range?.start.col).toBe(3);
+		expect(range?.end.col).toBe(3);
+		expect(Math.min(range!.start.row, range!.end.row)).toBe(0);
+		expect(Math.max(range!.start.row, range!.end.row)).toBe(3);
+		expect(await getCellText(sh, 0, 0)).toBe("Carol");
 	});
 
 	it("disables row insertion while a view sort is active", async () => {
 		await navigateTo(sh, "/sort-view");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
 
 		expect(await getRowCount(sh)).toBe(4);
 		await getPage().evaluate(() => {
@@ -123,8 +158,10 @@ describe("sorting", () => {
 			window.__SHEET_CONTROLLER__?.setCellValue(0, 3, null);
 		});
 
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort Z-A");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Carol");
 		expect(await getCellText(sh, 3, 0)).toBe("Alice");
@@ -132,7 +169,8 @@ describe("sorting", () => {
 
 	it("mutation sort reorders backing data and supports undo/redo", async () => {
 		await navigateTo(sh, "/sort-mutation");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Dave");
 
@@ -154,11 +192,14 @@ describe("sorting", () => {
 		expect(rowReorders.map((entry: any) => entry.source)).toEqual(["sort", "undo", "redo"]);
 	});
 
-	it("third click clears a mutation sort back to the pre-sort physical order", async () => {
+	it("clearing a mutation sort restores the pre-sort physical order", async () => {
 		await navigateTo(sh, "/sort-mutation");
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
-		await clickColumnHeader(sh, "Score");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Sort Z-A");
+		await rightClickColumnHeader(sh, "Score");
+		await clickContextMenuItem(sh, "Clear sort");
 
 		expect(await getCellText(sh, 0, 0)).toBe("Alice");
 
@@ -171,8 +212,10 @@ describe("sorting", () => {
 
 	it("mutation sort with formulas preserves evaluated results", async () => {
 		await navigateTo(sh, "/sort-mutation-formulas");
-		await clickColumnHeader(sh, "A");
-		await clickColumnHeader(sh, "A");
+		await rightClickColumnHeader(sh, "A");
+		await clickContextMenuItem(sh, "Sort A-Z");
+		await rightClickColumnHeader(sh, "A");
+		await clickContextMenuItem(sh, "Sort Z-A");
 
 		const topA = await getPage().evaluate(
 			() => window.__SHEET_CONTROLLER__?.getRawCellValue(0, 0),

@@ -236,6 +236,10 @@ function compareSortableEntries(
 	return direction === "asc" ? comparison : -comparison;
 }
 
+type ContextMenuState =
+	| { x: number; y: number; kind: "grid" }
+	| { x: number; y: number; kind: "column-header"; col: number };
+
 export default function Grid(props: GridProps) {
 	const customization = useSheetCustomization();
 	const workbookCoordinator = () => props.workbook?.coordinator ?? null;
@@ -251,7 +255,7 @@ export default function Grid(props: GridProps) {
 		props.defaultSortState,
 	);
 	const [mutationSortBaseOrder, setMutationSortBaseOrder] = createSignal<number[] | null>(null);
-	const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number } | null>(null);
+	const [contextMenu, setContextMenu] = createSignal<ContextMenuState | null>(null);
 	const [clipboardRange, setClipboardRange] = createSignal<CellRange | null>(null);
 	const [editorText, setEditorText] = createSignal("");
 	const [editorSource, setEditorSource] = createSignal<"cell" | "formula-bar">("cell");
@@ -1014,7 +1018,9 @@ export default function Grid(props: GridProps) {
 	}
 
 	function handleRowHeaderMouseDown(row: number, event: MouseEvent) {
-		event.preventDefault();
+		if (event.button !== 2) {
+			event.preventDefault();
+		}
 		if (isReferenceSelectionMode() || props.store.colCount() === 0) return;
 		if (props.store.editMode()) handleEditorCommit();
 		props.store.setSelection({
@@ -1026,10 +1032,13 @@ export default function Grid(props: GridProps) {
 			focus: { row, col: props.store.colCount() - 1 },
 			editing: null,
 		});
+		focusGrid();
 	}
 
 	function handleColumnHeaderMouseDown(col: number, event: MouseEvent) {
-		event.preventDefault();
+		if (event.button !== 2) {
+			event.preventDefault();
+		}
 		if (isReferenceSelectionMode() || props.store.rowCount() === 0) return;
 		if (props.store.editMode()) handleEditorCommit();
 		props.store.setSelection({
@@ -1041,6 +1050,7 @@ export default function Grid(props: GridProps) {
 			focus: { row: props.store.rowCount() - 1, col },
 			editing: null,
 		});
+		focusGrid();
 	}
 
 	function handleMouseMove(event: MouseEvent) {
@@ -1305,7 +1315,21 @@ export default function Grid(props: GridProps) {
 
 	function handleContextMenu(event: MouseEvent) {
 		event.preventDefault();
-		setContextMenu({ x: event.clientX, y: event.clientY });
+		const headerElement = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+			".se-header-cell[data-col-index], .se-header-ref-cell[data-col-index]",
+		);
+		const columnIndexText = headerElement?.dataset.colIndex;
+		const columnIndex = columnIndexText === undefined ? NaN : Number(columnIndexText);
+		if (Number.isInteger(columnIndex) && columnIndex >= 0) {
+			setContextMenu({
+				x: event.clientX,
+				y: event.clientY,
+				kind: "column-header",
+				col: columnIndex,
+			});
+			return;
+		}
+		setContextMenu({ x: event.clientX, y: event.clientY, kind: "grid" });
 	}
 
 	function handleInsertRows(atIndex: number, count: number) {
@@ -1370,6 +1394,40 @@ export default function Grid(props: GridProps) {
 	}
 
 	const contextMenuItems = createMemo<ContextMenuEntry[]>(() => {
+		const menu = contextMenu();
+		if (menu?.kind === "column-header") {
+			const column = props.columns[menu.col];
+			const isSortable = column?.sortable !== false;
+			const isCurrentColumnSorted = currentSortState()?.columnId === column?.id;
+			return [
+				{
+					label: "Sort A-Z",
+					disabled: !column || !isSortable,
+					action: () => {
+						if (!column) return;
+						handleSort(column.id, "asc");
+					},
+				},
+				{
+					label: "Sort Z-A",
+					disabled: !column || !isSortable,
+					action: () => {
+						if (!column) return;
+						handleSort(column.id, "desc");
+					},
+				},
+				{ type: "separator" },
+				{
+					label: "Clear sort",
+					disabled: !column || !isCurrentColumnSorted,
+					action: () => {
+						if (!column) return;
+						handleSort(column.id, null);
+					},
+				},
+			];
+		}
+
 		const isReadOnly = props.readOnly;
 		const sel = props.store.selection();
 		const anchorRow = sel.anchor.row;
@@ -1520,7 +1578,7 @@ export default function Grid(props: GridProps) {
 		commitRowReorder(sort.columnId, sort.direction, nextOrder);
 	}
 
-	function handleSort(columnId: string) {
+	function handleSort(columnId: string, requestedDirection?: SortDirection | null) {
 		if (props.store.editMode()) {
 			handleEditorCommit();
 		}
@@ -1530,7 +1588,11 @@ export default function Grid(props: GridProps) {
 
 		const current = currentSortState();
 		let nextState: SortState | null;
-		if (!current || current.columnId !== columnId) {
+		if (requestedDirection !== undefined) {
+			nextState = requestedDirection === null
+				? null
+				: { columnId, direction: requestedDirection };
+		} else if (!current || current.columnId !== columnId) {
 			nextState = { columnId, direction: "asc" };
 		} else if (current.direction === "asc") {
 			nextState = { columnId, direction: "desc" };
@@ -2025,7 +2087,6 @@ export default function Grid(props: GridProps) {
 					pinnedLeftOffsets={pinnedLeftOffsets()}
 					lastPinnedIndex={lastPinnedIndex()}
 					onColumnResize={handleColumnResize}
-					onSort={handleSort}
 					onColumnHeaderMouseDown={handleColumnHeaderMouseDown}
 				/>
 

@@ -2,9 +2,9 @@ import { createSignal } from "solid-js";
 import { Sheet } from "peculiar-sheets";
 import type { ColumnDef, CellValue, SortDirection } from "peculiar-sheets";
 
-// sortBehavior="external" — the sheet fires onSort with columnId + direction
-// but never reorders itself. The host owns the data order.
-// Useful for server-side sorting or custom sort logic.
+// sortBehavior="external" — clicking a header selects the full column.
+// Use the header context menu to fire onSort with columnId + direction.
+// The sheet never reorders itself; the host owns the data order.
 
 const columns: ColumnDef[] = [
   { id: "name",  header: "Name",  width: 140, editable: true, sortable: true },

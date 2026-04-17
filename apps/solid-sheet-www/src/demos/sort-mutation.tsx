@@ -1,8 +1,9 @@
 import { Sheet } from "peculiar-sheets";
 import type { ColumnDef, CellValue } from "peculiar-sheets";
 
-// sortBehavior="mutation" — clicking a header physically reorders the
-// data array in place. Row indices update; useful for export/persistence.
+// sortBehavior="mutation" — clicking a header selects the full column.
+// Use the header context menu to physically reorder the data array in place.
+// Row indices update; useful for export/persistence.
 
 const columns: ColumnDef[] = [
   { id: "name",  header: "Name",  width: 140, editable: true, sortable: true },

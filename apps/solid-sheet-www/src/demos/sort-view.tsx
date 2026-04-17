@@ -1,9 +1,9 @@
 import { Sheet } from "peculiar-sheets";
 import type { ColumnDef, CellValue } from "peculiar-sheets";
 
-// sortBehavior="view" — clicking a header reorders the visible rows only.
+// sortBehavior="view" — clicking a header selects the full column.
+// Use the header context menu to sort the visible rows A-Z or Z-A.
 // The underlying data array is never mutated.
-// Click again to cycle: ascending → descending → unsorted.
 
 const columns: ColumnDef[] = [
   { id: "name",  header: "Name",  width: 140, editable: true, sortable: true },

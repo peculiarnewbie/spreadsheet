@@ -116,6 +116,25 @@ function rowHeaderLocator(row: number) {
 	);
 }
 
+async function getColumnHeaderCenter(label: string): Promise<{ x: number; y: number }> {
+	return getPage().evaluate((targetLabel: string) => {
+		const headers = Array.from(
+			document.querySelectorAll<HTMLElement>(".se-header-row--columns .se-header-cell"),
+		);
+		const header = headers.find((element) =>
+			(element.textContent ?? "").trim().startsWith(targetLabel),
+		);
+		if (!header) {
+			throw new Error(`Column header not found: ${targetLabel}`);
+		}
+		const rect = header.getBoundingClientRect();
+		return {
+			x: rect.left + rect.width / 2,
+			y: rect.top + rect.height / 2,
+		};
+	}, label);
+}
+
 /** Click a cell at the given (0-indexed) row/col position. */
 export async function clickCell(
 	_sh: Stagehand,
@@ -130,7 +149,26 @@ export async function clickColumnHeader(
 	_sh: Stagehand,
 	label: string,
 ) {
-	await getPage().evaluate((targetLabel: string) => {
+	const page = getPage();
+	const { x, y } = await getColumnHeaderCenter(label);
+
+	await page.sendCDP("Input.dispatchMouseEvent", {
+		type: "mouseMoved", x, y, button: "none",
+	});
+	await page.sendCDP("Input.dispatchMouseEvent", {
+		type: "mousePressed", x, y, button: "left", clickCount: 1,
+	});
+	await page.sendCDP("Input.dispatchMouseEvent", {
+		type: "mouseReleased", x, y, button: "left", clickCount: 1,
+	});
+}
+
+export async function rightClickColumnHeader(
+	_sh: Stagehand,
+	label: string,
+) {
+	const page = getPage();
+	await page.evaluate((targetLabel: string) => {
 		const headers = Array.from(
 			document.querySelectorAll<HTMLElement>(".se-header-row--columns .se-header-cell"),
 		);
@@ -140,8 +178,33 @@ export async function clickColumnHeader(
 		if (!header) {
 			throw new Error(`Column header not found: ${targetLabel}`);
 		}
-		header.click();
+		const rect = header.getBoundingClientRect();
+		const clientX = rect.left + rect.width / 2;
+		const clientY = rect.top + rect.height / 2;
+		header.dispatchEvent(new MouseEvent("mousedown", {
+			bubbles: true,
+			button: 2,
+			buttons: 2,
+			clientX,
+			clientY,
+		}));
+		header.dispatchEvent(new MouseEvent("contextmenu", {
+			bubbles: true,
+			button: 2,
+			buttons: 2,
+			clientX,
+			clientY,
+		}));
+		header.dispatchEvent(new MouseEvent("mouseup", {
+			bubbles: true,
+			button: 2,
+			buttons: 0,
+			clientX,
+			clientY,
+		}));
 	}, label);
+
+	await poll(() => Boolean(document.querySelector(".se-context-menu")));
 }
 
 /** Double-click a cell to enter edit mode. */
@@ -252,8 +315,18 @@ export async function clickContextMenuItem(
 	label: string,
 ) {
 	const page = getPage();
-	const item = page.locator(`.se-context-menu__item >> text="${label}"`);
-	await item.click();
+	await page.evaluate((targetLabel: string) => {
+		const items = Array.from(
+			document.querySelectorAll<HTMLButtonElement>(".se-context-menu__item"),
+		);
+		const item = items.find((element) =>
+			(element.textContent ?? "").includes(targetLabel),
+		);
+		if (!item) {
+			throw new Error(`Context menu item not found: ${targetLabel}`);
+		}
+		item.click();
+	}, label);
 	// Wait for the menu to close
 	await page.waitForTimeout(100);
 }

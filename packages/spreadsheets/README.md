@@ -154,7 +154,7 @@ Notes:
 
 ## Sorting
 
-By default, the sheet uses `sortBehavior="view"`. Header clicks cycle `asc -> desc -> none`.
+By default, the sheet uses `sortBehavior="view"`. Clicking a column header selects the full column. Use the column header context menu to sort `A-Z`, `Z-A`, or clear the active sort.
 
 Use `sortBehavior="external"` to keep sorting as host-controlled UI state only.
 
