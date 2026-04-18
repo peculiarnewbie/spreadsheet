@@ -20,6 +20,7 @@ import FormulaRowsSheet    from "./demos/formula-rows";
 import FormulaRowDeleteSheet from "./demos/formula-row-delete";
 import CrossSheetDemo      from "./demos/cross-sheet";
 import CustomRenderingSheet from "./demos/custom-rendering";
+import StylingSheet         from "./demos/styling";
 
 // ── Raw source strings for the code toggle ──────────────────
 import basicCode                from "./demos/basic?raw";
@@ -38,6 +39,7 @@ import formulaRowsCode          from "./demos/formula-rows?raw";
 import formulaRowDeleteCode     from "./demos/formula-row-delete?raw";
 import crossSheetCode           from "./demos/cross-sheet?raw";
 import customRenderingCode      from "./demos/custom-rendering?raw";
+import stylingCode              from "./demos/styling?raw";
 
 // ── Install command ─────────────────────────────────────────
 
@@ -266,6 +268,20 @@ const DEMOS = [
     ],
     tall: false,
   },
+  {
+    id: "styling",
+    tab: "Styling",
+    title: "Range Styling",
+    desc: "Declarative range-based cell styling. createRangeStyles compiles a list of range \u2192 style rules into an O(rules) per-cell lookup, wired into the grid via customization.getCellStyle. Later rules shallow-merge over earlier (CSS-cascade semantics). Targets can be a single cell, a rectangular range, or an array mixing both.",
+    badges: [
+      "createRangeStyles",
+      "getCellStyle",
+      "range \u2192 CSS",
+      "cascade merge",
+      "single cell / range / mixed",
+    ],
+    tall: false,
+  },
 ] as const;
 
 type DemoId = (typeof DEMOS)[number]["id"];
@@ -287,6 +303,7 @@ const DEMO_CODE: Record<DemoId, string> = {
   "formula-row-delete":     formulaRowDeleteCode,
   "cross-sheet":            crossSheetCode,
   "custom-rendering":       customRenderingCode,
+  "styling":                stylingCode,
 };
 
 const GROUPS = [
@@ -303,7 +320,7 @@ const GROUPS = [
       "sort-mutation-formulas",
     ],
   },
-  { name: "Advanced", ids: ["large", "custom-rendering"] },
+  { name: "Advanced", ids: ["large", "custom-rendering", "styling"] },
 ] as const satisfies readonly {
   readonly name: string;
   readonly ids: readonly DemoId[];
@@ -574,6 +591,9 @@ function DemoPlayground() {
                 </Match>
                 <Match when={activeId() === "custom-rendering"}>
                   <CustomRenderingSheet />
+                </Match>
+                <Match when={activeId() === "styling"}>
+                  <StylingSheet />
                 </Match>
               </Switch>
                   }

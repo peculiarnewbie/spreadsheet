@@ -7,6 +7,7 @@ import {
 	type FormulaEngineConfig,
 	type RowReorderMutation,
 	type SheetController,
+	type SheetCustomization,
 	type SortBehavior,
 	type SortState,
 } from "peculiar-sheets";
@@ -22,6 +23,7 @@ export interface HarnessProps {
 	sortBehavior?: SortBehavior;
 	defaultSortState?: SortState | null;
 	onSort?: (columnId: string, direction: SortState["direction"] | null) => void;
+	customization?: SheetCustomization;
 }
 
 /**
@@ -141,6 +143,7 @@ export default function Harness(props: HarnessProps) {
 				formulaEngine={props.formulaEngine}
 				showFormulaBar={props.showFormulaBar}
 				showReferenceHeaders={props.showReferenceHeaders}
+				customization={props.customization}
 				onCellEdit={handleCellEdit}
 				onBatchEdit={handleBatchEdit}
 				onRowInsert={handleRowInsert}

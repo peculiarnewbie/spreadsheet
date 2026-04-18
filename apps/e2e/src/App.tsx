@@ -21,6 +21,7 @@ import FormulaRowsPage from "./routes/formula-rows";
 import FormulaRowDeletePage from "./routes/formula-row-delete";
 import CrossSheetPage from "./routes/cross-sheet";
 import CustomRenderingPage from "./routes/custom-rendering";
+import StylingPage from "./routes/styling";
 
 const rootRoute = createRootRoute({
 	component: () => <Outlet />,
@@ -48,6 +49,7 @@ const indexRoute = createRoute({
 				<li><a href="/formula-row-delete">Formula + Row Delete</a></li>
 				<li><a href="/cross-sheet">Cross Sheet</a></li>
 				<li><a href="/custom-rendering">Custom Rendering</a></li>
+				<li><a href="/styling">Styling</a></li>
 			</ul>
 		</nav>
 	),
@@ -149,6 +151,12 @@ const customRenderingRoute = createRoute({
 	component: CustomRenderingPage,
 });
 
+const stylingRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/styling",
+	component: StylingPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	indexRoute,
 	basicRoute,
@@ -167,6 +175,7 @@ const routeTree = rootRoute.addChildren([
 	formulaRowDeleteRoute,
 	crossSheetRoute,
 	customRenderingRoute,
+	stylingRoute,
 ]);
 
 const router = createRouter({ routeTree });
