@@ -2244,11 +2244,31 @@ export default function Grid(props: GridProps) {
 				clearSelection: () => props.store.setSelection(emptySelection()),
 				scrollToCell: (row, col) => {
 					if (!viewportRef) return;
-					const top = rowMetrics().getRowTop(row);
-					let left = 0;
-					for (let c = 0; c < col; c++) {
-						left += columnWidths()[c] ?? DEFAULT_COL_WIDTH;
+					// Land the cell just below the sticky header / right of the sticky
+					// row gutter + pinned columns so it's fully visible. Without this
+					// offset, the cell ends up hidden under the sticky overlays and
+					// the `scrollCellIntoView` effect would re-scroll on the next
+					// click — which breaks synthesized double-clicks whose two
+					// events fire at stale coordinates.
+					const stickyTop = headerTotalHeight();
+					const top = Math.max(0, rowMetrics().getRowTop(row) - stickyTop);
+
+					const widths = columnWidths();
+					const isColPinned = props.columns[col]?.pinned === "left";
+					let left = viewportRef.scrollLeft;
+					if (!isColPinned) {
+						let stickyLeft = rowGutterWidth();
+						for (let c = 0; c < props.columns.length; c++) {
+							if (props.columns[c]?.pinned === "left") {
+								stickyLeft += widths[c] ?? DEFAULT_COL_WIDTH;
+							} else {
+								break;
+							}
+						}
+						const cellLeft = columnLeftOffsets()[col] ?? rowGutterWidth();
+						left = Math.max(0, cellLeft - stickyLeft);
 					}
+
 					viewportRef.scrollTo({ top, left });
 				},
 				startEditing: (row, col) => startEditing({ row, col }),

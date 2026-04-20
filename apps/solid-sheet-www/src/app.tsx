@@ -317,7 +317,7 @@ const DEMO_CODE: Record<DemoId, string> = {
 const GROUPS = [
   { name: "Basics", ids: ["basic", "readonly"] },
   { name: "Formulas", ids: ["formulas", "cross-sheet"] },
-  { name: "Editing", ids: ["clipboard", "autofill", "history"] },
+  { name: "Editing", ids: ["autofill", "history", "clipboard"] },
   { name: "Rows", ids: ["rows", "formula-rows", "formula-row-delete"] },
   {
     name: "Sorting",

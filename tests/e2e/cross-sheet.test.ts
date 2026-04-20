@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { getPage, getStagehand, navigateTo } from "./setup";
+import { clickContextMenuItem, getPage, getStagehand, navigateTo } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
 function sheetCellLocator(sheetTestId: string, row: number, col: number) {
@@ -48,19 +48,53 @@ async function dragWithinSheet(
 	});
 }
 
-async function clickSheetHeader(sheetTestId: string, label: string) {
-	await getPage().evaluate(({ testId, targetLabel }) => {
+async function rightClickSheetHeader(sheetTestId: string, label: string) {
+	const page = getPage();
+	await page.evaluate(({ testId, targetLabel }) => {
 		const wrapper = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
 		if (!wrapper) throw new Error(`Sheet wrapper not found: ${testId}`);
 		const headers = Array.from(
 			wrapper.querySelectorAll<HTMLElement>(".se-header-row--columns .se-header-cell"),
 		);
 		const header = headers.find((element) =>
-			(element.textContent ?? "").trim().startsWith(targetLabel)
+			(element.textContent ?? "").trim().startsWith(targetLabel),
 		);
 		if (!header) throw new Error(`Header not found: ${targetLabel}`);
-		header.click();
+		const rect = header.getBoundingClientRect();
+		const clientX = rect.left + rect.width / 2;
+		const clientY = rect.top + rect.height / 2;
+		header.dispatchEvent(new MouseEvent("mousedown", {
+			bubbles: true,
+			button: 2,
+			buttons: 2,
+			clientX,
+			clientY,
+		}));
+		header.dispatchEvent(new MouseEvent("contextmenu", {
+			bubbles: true,
+			button: 2,
+			buttons: 2,
+			clientX,
+			clientY,
+		}));
+		header.dispatchEvent(new MouseEvent("mouseup", {
+			bubbles: true,
+			button: 2,
+			buttons: 0,
+			clientX,
+			clientY,
+		}));
 	}, { testId: sheetTestId, targetLabel: label });
+
+	// Poll until the context menu appears — sorts are triggered through it now
+	// that header-click sorting was removed.
+	const start = Date.now();
+	while (Date.now() - start < 5_000) {
+		const exists = await page.evaluate(() => Boolean(document.querySelector(".se-context-menu")));
+		if (exists) return;
+		await page.waitForTimeout(50);
+	}
+	throw new Error("Context menu did not appear after right-click on sheet header");
 }
 
 describe("cross-sheet workbook mode", () => {
@@ -193,8 +227,8 @@ describe("cross-sheet workbook mode", () => {
 	});
 
 	it("keeps cross-sheet dependents coherent after mutation sort", async () => {
-		await clickSheetHeader("sheet-data", "Value");
-		await clickSheetHeader("sheet-data", "Value");
+		await rightClickSheetHeader("sheet-data", "Value");
+		await clickContextMenuItem(sh, "Sort Z-A");
 
 		const data = await getPage().evaluate(() => (window as any).__WORKBOOK_DATA__.data);
 		const total = await getPage().evaluate(
