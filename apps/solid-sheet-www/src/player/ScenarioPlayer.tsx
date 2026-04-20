@@ -105,14 +105,17 @@ export function ScenarioPlayer(props: ScenarioPlayerProps): JSX.Element {
 	// synthetic events against a sheet the user is now steering themselves.
 	let aborted = false;
 
-	// Reset UI when the user picks a different scenario
-	createEffect(() => {
-		selectedId();
-		setCurrentStepIndex(null);
-		setCaption("");
-		setPips([]);
-		setErrorMessage(null);
-	});
+	// Pause between loop iterations. Replay mode is a "trailer" — we re-run
+	// the scenario forever until the user interacts, leaving a visible beat
+	// so viewers can read the final caption + pip strip before it restarts.
+	const LOOP_GAP_MS = 3000;
+	let loopTimer: ReturnType<typeof setTimeout> | null = null;
+	function cancelLoopTimer(): void {
+		if (loopTimer != null) {
+			clearTimeout(loopTimer);
+			loopTimer = null;
+		}
+	}
 
 	const activeScenario = createMemo(() =>
 		props.scenarios.find((s) => s.id === selectedId()) ?? props.scenarios[0],
@@ -120,22 +123,38 @@ export function ScenarioPlayer(props: ScenarioPlayerProps): JSX.Element {
 
 	onCleanup(() => {
 		aborted = true;
+		cancelLoopTimer();
 		cursor?.hide();
 	});
 
-	// Autoplay — once the host handle is available and we haven't run yet,
-	// launch the first scenario so Replay mode feels alive on first paint.
-	let hasAutoPlayed = false;
+	// Reset UI + kick off playback whenever the active scenario or host
+	// handle changes. Covers two paths:
+	//   - first mount (once `props.host` populates),
+	//   - user picks a different scenario from the dropdown.
+	// Cancels any pending loop timer so we don't race a stale restart
+	// against the fresh run.
 	createEffect(() => {
-		if ((props.autoPlay ?? true) && props.host && !hasAutoPlayed && !isRunning()) {
-			hasAutoPlayed = true;
-			// Defer one frame so the sheet has painted before we start firing
-			// synthetic events against it.
-			queueMicrotask(() => {
-				if (aborted) return;
-				void play();
-			});
-		}
+		const id = selectedId();
+		const host = props.host;
+
+		setCurrentStepIndex(null);
+		setCaption("");
+		setPips([]);
+		setErrorMessage(null);
+		cancelLoopTimer();
+
+		if (!(props.autoPlay ?? true)) return;
+		if (!host) return;
+		if (!id) return;
+
+		// Defer one tick so the sheet has painted and any previous in-flight
+		// run has released its iteration before we start firing events.
+		queueMicrotask(() => {
+			if (aborted) return;
+			if (isRunning()) return;
+			if (selectedId() !== id) return;
+			void play();
+		});
 	});
 
 	function handleEvent(event: ScenarioEvent): void {
@@ -184,6 +203,9 @@ export function ScenarioPlayer(props: ScenarioPlayerProps): JSX.Element {
 		const scenario = activeScenario();
 		if (!scenario || isRunning() || !props.host) return;
 
+		// Any pending loop restart is superseded by this explicit run.
+		cancelLoopTimer();
+
 		setIsRunning(true);
 		setErrorMessage(null);
 
@@ -194,14 +216,16 @@ export function ScenarioPlayer(props: ScenarioPlayerProps): JSX.Element {
 			isAborted: () => aborted,
 		});
 
+		let completedCleanly = false;
 		try {
 			await runScenario(scenario, driver, {
 				onEvent: handleEvent,
 				defaultAssertMode: "soft",
 			});
+			completedCleanly = true;
 		} catch (err) {
 			// Abort is the expected path when the user clicks the shield to
-			// drop back to Live — swallow silently.
+			// drop back to Live — swallow silently and DON'T reschedule.
 			if (isScenarioAbortError(err)) return;
 			// Action-step errors still throw (scenario structurally broken). Surface
 			// them in the caption bar instead of crashing the page.
@@ -210,6 +234,19 @@ export function ScenarioPlayer(props: ScenarioPlayerProps): JSX.Element {
 			setIsRunning(false);
 			cursor?.hide();
 		}
+
+		// Trailer loop: on a clean run, wait LOOP_GAP_MS then restart — but
+		// only if we're still mounted AND the user hasn't picked a different
+		// scenario during the wait. Broken runs (errors) don't re-loop so the
+		// failure message stays visible.
+		if (!completedCleanly || aborted) return;
+		const loopedId = scenario.id;
+		loopTimer = setTimeout(() => {
+			loopTimer = null;
+			if (aborted) return;
+			if (activeScenario()?.id !== loopedId) return;
+			void play();
+		}, LOOP_GAP_MS);
 	}
 
 	const passCount = createMemo(() => pips().filter((p) => p.state === "pass").length);
