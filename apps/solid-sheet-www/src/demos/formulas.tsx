@@ -1,6 +1,7 @@
 import HyperFormula from "hyperformula";
 import { Sheet } from "peculiar-sheets";
 import type { ColumnDef, CellValue } from "peculiar-sheets";
+import { ReplayHost, type ReplayHostHandle } from "../player/ReplayHost";
 
 const hf = HyperFormula.buildEmpty({ licenseKey: "gpl-v3" });
 const sheetName = hf.addSheet("formulas");
@@ -19,14 +20,31 @@ const data: CellValue[][] = [
   [null, null, "=SUM(C1:C3)"],
 ];
 
-export default function FormulasSheet() {
+export interface FormulasSheetProps {
+  /** Called once the replay host has mounted. Forwards the controller + buffer
+   * up to the parent `ScenarioPlayer`, which drives scenarios against this
+   * `<Sheet>` without touching `window.*` globals. */
+  onReplayReady?: (handle: ReplayHostHandle) => void;
+}
+
+export default function FormulasSheet(props: FormulasSheetProps = {}) {
   return (
-    <Sheet
-      data={data}
-      columns={columns}
-      formulaEngine={{ instance: hf, sheetId, sheetName }}
-      showFormulaBar
-      showReferenceHeaders
-    />
+    <ReplayHost initialData={data} columns={columns} onReady={props.onReplayReady}>
+      {({ data: liveData, bindings, ref }) => (
+        <Sheet
+          data={liveData()}
+          columns={columns}
+          formulaEngine={{ instance: hf, sheetId, sheetName }}
+          showFormulaBar
+          showReferenceHeaders
+          onCellEdit={bindings.onCellEdit}
+          onBatchEdit={bindings.onBatchEdit}
+          onRowInsert={bindings.onRowInsert}
+          onRowDelete={bindings.onRowDelete}
+          onRowReorder={bindings.onRowReorder}
+          ref={ref}
+        />
+      )}
+    </ReplayHost>
   );
 }

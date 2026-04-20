@@ -10,9 +10,15 @@
 
 import type { Scenario, Step } from "../types";
 import { basicScenarios } from "./basic";
+import { autofillScenarios } from "./autofill";
+import { historyScenarios } from "./history";
+import { formulasScenarios } from "./formulas";
 
 export const SCENARIOS: Record<string, Scenario[]> = {
 	basic: basicScenarios,
+	autofill: autofillScenarios,
+	history: historyScenarios,
+	formulas: formulasScenarios,
 };
 
 /** Look up scenarios for a demo id. Returns `[]` when the demo has no scenarios yet. */
@@ -58,4 +64,4 @@ export function getReplayScenariosFor(demoId: string): Scenario[] {
 	return getScenariosFor(demoId).filter(isReplayable);
 }
 
-export { basicScenarios };
+export { basicScenarios, autofillScenarios, historyScenarios, formulasScenarios };

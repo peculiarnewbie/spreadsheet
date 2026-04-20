@@ -555,7 +555,10 @@ function DemoPlayground() {
 
         <div class="demo-content">
           <div class="demo-meta">
-            <h3 class="demo-title">{demo().title}</h3>
+            <div class="demo-meta-text">
+              <h3 class="demo-title">{demo().title}</h3>
+              <p class="demo-desc">{demo().desc}</p>
+            </div>
             <div class="demo-view-toggle" role="tablist" aria-label="View mode">
               <button
                 type="button"
@@ -599,16 +602,16 @@ function DemoPlayground() {
                             <BasicSheet onReplayReady={setReplayHandle} />
                           </Match>
                           <Match when={activeId() === "formulas"}>
-                            <FormulasSheet />
+                            <FormulasSheet onReplayReady={setReplayHandle} />
                           </Match>
                           <Match when={activeId() === "clipboard"}>
                             <ClipboardSheet />
                           </Match>
                           <Match when={activeId() === "autofill"}>
-                            <AutofillSheet />
+                            <AutofillSheet onReplayReady={setReplayHandle} />
                           </Match>
                           <Match when={activeId() === "history"}>
-                            <HistorySheet />
+                            <HistorySheet onReplayReady={setReplayHandle} />
                           </Match>
                           <Match when={activeId() === "readonly"}>
                             <ReadonlySheet />
