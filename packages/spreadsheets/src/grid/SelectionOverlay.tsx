@@ -10,7 +10,7 @@ interface SelectionOverlayProps {
 	externalReferenceRange: CellRange | null;
 	fillPreview: FillPreview | null;
 	showFillHandle: boolean;
-	columnWidths: number[];
+	columnOffsets: number[];
 	rowMetrics: RowMetrics;
 	scrollLeft: number;
 	scrollTop: number;
@@ -27,20 +27,14 @@ interface RangeRect {
 
 function computeRangeRect(
 	range: CellRange,
-	columnWidths: number[],
+	columnOffsets: number[],
 	rowMetrics: RowMetrics,
 ): RangeRect {
 	const nr = normalizeRange(range);
 
-	let left = 0;
-	for (let c = 0; c < nr.start.col; c++) {
-		left += columnWidths[c] ?? 120;
-	}
-
-	let width = 0;
-	for (let c = nr.start.col; c <= nr.end.col; c++) {
-		width += columnWidths[c] ?? 120;
-	}
+	const left = columnOffsets[nr.start.col] ?? 0;
+	const right = columnOffsets[nr.end.col + 1] ?? left;
+	const width = Math.max(0, right - left);
 
 	const top = rowMetrics.getRowTop(nr.start.row);
 	const endTop = rowMetrics.getRowTop(nr.end.row);
@@ -52,37 +46,37 @@ function computeRangeRect(
 export default function SelectionOverlay(props: SelectionOverlayProps) {
 	const rects = () =>
 		props.selection.ranges.map((range) =>
-			computeRangeRect(range, props.columnWidths, props.rowMetrics),
+			computeRangeRect(range, props.columnOffsets, props.rowMetrics),
 		);
 
 	const clipboardRect = () => {
 		const range = props.clipboardRange;
 		if (!range) return null;
-		return computeRangeRect(range, props.columnWidths, props.rowMetrics);
+		return computeRangeRect(range, props.columnOffsets, props.rowMetrics);
 	};
 
 	const referenceRect = () => {
 		const range = props.referenceRange;
 		if (!range) return null;
-		return computeRangeRect(range, props.columnWidths, props.rowMetrics);
+		return computeRangeRect(range, props.columnOffsets, props.rowMetrics);
 	};
 
 	const externalReferenceRect = () => {
 		const range = props.externalReferenceRange;
 		if (!range) return null;
-		return computeRangeRect(range, props.columnWidths, props.rowMetrics);
+		return computeRangeRect(range, props.columnOffsets, props.rowMetrics);
 	};
 
 	const fillPreviewRect = () => {
 		const preview = props.fillPreview;
 		if (!preview) return null;
-		return computeRangeRect(preview.extension, props.columnWidths, props.rowMetrics);
+		return computeRangeRect(preview.extension, props.columnOffsets, props.rowMetrics);
 	};
 
 	const primaryRect = () => {
 		const range = primaryRange(props.selection);
 		if (!range) return null;
-		return computeRangeRect(range, props.columnWidths, props.rowMetrics);
+		return computeRangeRect(range, props.columnOffsets, props.rowMetrics);
 	};
 
 	return (

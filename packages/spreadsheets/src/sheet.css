@@ -162,18 +162,27 @@
 .se-resize-handle {
 	position: absolute;
 	top: 0;
-	right: -2px;
-	width: 5px;
+	right: -5px;
+	width: 10px;
 	height: 100%;
 	cursor: col-resize;
 	z-index: 1;
 }
 
-.se-resize-handle:hover {
+.se-resize-handle::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	right: 4px;
+	width: 2px;
+	height: 100%;
+}
+
+.se-resize-handle:hover::after {
 	background: #4a6fa5;
 }
 
-.se-resize-handle--active {
+.se-resize-handle--active::after {
 	background: #4a6fa5;
 }
 
@@ -209,14 +218,27 @@
 .se-row-resize-handle {
 	position: absolute;
 	left: 0;
-	bottom: -2px;
+	bottom: -5px;
 	width: 100%;
-	height: 5px;
+	height: 10px;
 	cursor: row-resize;
 	z-index: 2;
 }
 
-.se-row-resize-handle:hover {
+.se-row-resize-handle::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	bottom: 4px;
+	width: 100%;
+	height: 2px;
+}
+
+.se-row-resize-handle:hover::after {
+	background: #4a6fa5;
+}
+
+.se-row-header-cell--resizing .se-row-resize-handle::after {
 	background: #4a6fa5;
 }
 

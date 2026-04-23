@@ -97,12 +97,12 @@ function coerceDisplayValue(result: unknown, rawValue: CellValue): CellValue {
 
 /**
  * Creates a formula bridge from the engine config.
- * Returns null if no config is provided.
+ * Returns Ok(null) if no config is provided.
  */
 export function createFormulaBridge(
 	config: FormulaEngineConfig | undefined,
-): FormulaBridge | null {
-	if (!config) return null;
+): ResultLike<FormulaBridge | null, FormulaBridgeError> {
+	if (!config) return Result.ok(null);
 
 	const hf = config.instance as HyperFormulaLike;
 	let resolvedSheetId: number | null = config.sheetId ?? null;
@@ -457,7 +457,10 @@ export function createFormulaBridge(
 		});
 	}
 
-	trySubscribeValuesUpdated();
+	const subscriptionResult = trySubscribeValuesUpdated();
+	if (Result.isError(subscriptionResult)) {
+		return subscriptionResult;
+	}
 
 	const bridge: FormulaBridge = {
 		ensureSheet() {
@@ -506,5 +509,5 @@ export function createFormulaBridge(
 		},
 	};
 
-	return bridge;
+	return Result.ok(bridge);
 }

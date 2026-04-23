@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { createFormulaBridge } from "./bridge";
+import { createFormulaBridge, type FormulaBridge } from "./bridge";
 import type { CellValue } from "../types";
+import { Result } from "../internal/result";
 
 function columnLettersToIndex(input: string): number {
 	let index = 0;
@@ -131,10 +132,18 @@ function createMockEngine() {
 	};
 }
 
+function createTestBridge(engine: ReturnType<typeof createMockEngine>): FormulaBridge {
+	const result = createFormulaBridge({ instance: engine, sheetName: "Test" });
+	if (!Result.isOk(result) || !result.value) {
+		throw new Error("Expected formula bridge");
+	}
+	return result.value;
+}
+
 describe("formula bridge after row delete", () => {
 	it("reflects recalculated display values after delete sync", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		const initialData: CellValue[][] = [
 			[48, 52, "=A1+B1"],
@@ -159,7 +168,7 @@ describe("formula bridge after row delete", () => {
 
 	it("surfaces #REF! displays after delete invalidates a referenced row", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		bridge.syncAll([
 			[10, null],
@@ -177,7 +186,7 @@ describe("formula bridge after row delete", () => {
 
 	it("delete -> undo -> redo stays coherent through syncAll", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		const original: CellValue[][] = [
 			[10, "=A1+A2"],

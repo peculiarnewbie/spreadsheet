@@ -18,16 +18,18 @@ import {
 	getErrorMessage,
 	isApplied,
 	noop,
-	type OperationOutcome,
 	type ResultLike,
 } from "../internal/result";
 import { errorTraceContext, withTraceContext } from "../internal/trace";
 import type {
 	WorkbookCoordinator,
 	WorkbookCoordinatorOptions,
+	WorkbookHistoryResult,
+	WorkbookReferenceResult,
 	WorkbookSheetBinding,
 	WorkbookStructuralChange,
 	WorkbookStructuralOrigin,
+	WorkbookStructuralResult,
 } from "./types";
 
 interface HyperFormulaWorkbookLike {
@@ -90,21 +92,9 @@ type WorkbookCoordinatorWithInternals = WorkbookCoordinator & {
 	[workbookCoordinatorInternals]: WorkbookCoordinatorInternals;
 };
 
-type StructuralOpNoopReason = "invalid-count" | "engine-rejected";
-type StructuralOpResult = ResultLike<
-	OperationOutcome<WorkbookStructuralChange, StructuralOpNoopReason>,
-	WorkbookCoordinatorError
->;
-type ReferenceNoopReason = "missing-controller" | "reference-unavailable";
-type ReferenceInsertResult = ResultLike<
-	OperationOutcome<boolean, ReferenceNoopReason>,
-	WorkbookCoordinatorError
->;
-type HistoryNoopReason = "history-empty";
-type HistoryResult = ResultLike<
-	OperationOutcome<WorkbookStructuralChange, HistoryNoopReason>,
-	WorkbookCoordinatorError
->;
+type StructuralOpResult = WorkbookStructuralResult;
+type ReferenceInsertResult = WorkbookReferenceResult;
+type HistoryResult = WorkbookHistoryResult;
 type SnapshotResult = ResultLike<WorkbookStructuralChange["snapshots"], WorkbookCoordinatorError>;
 type RuntimeResult = ResultLike<WorkbookSheetRuntime, WorkbookCoordinatorError>;
 
@@ -167,13 +157,6 @@ function formatReferenceText(referenceText: string, range: CellRange): string {
 		return referenceText.slice(0, -(`:${cellRef}`).length);
 	}
 	return referenceText;
-}
-
-function toPublicStructuralChange(
-	result: ResultLike<OperationOutcome<WorkbookStructuralChange, string>, WorkbookCoordinatorError>,
-): WorkbookStructuralChange | null {
-	if (Result.isError(result)) return null;
-	return isApplied(result.value) ? result.value.value : null;
 }
 
 function toPublicReferenceResult(result: ReferenceInsertResult): boolean {
@@ -353,7 +336,23 @@ export function createWorkbookCoordinator(
 	): WorkbookStructuralChange {
 		const change = { origin, snapshots };
 		for (const listener of listeners) {
-			listener(change);
+			const listenerResult = Result.try({
+				try: () => listener(change),
+				catch: (cause) => new WorkbookStructuralOperationError({
+					operation: "emitChange",
+					...originTraceContext(origin),
+					message: getErrorMessage(cause),
+					cause,
+				}),
+			});
+			if (Result.isError(listenerResult)) {
+				withTraceContext({
+					module: "workbook-coordinator",
+					operation: "emitChange",
+					phase: "listener",
+					context: originTraceContext(origin),
+				}).err(errorTraceContext(listenerResult.error));
+			}
 		}
 		return change;
 	}
@@ -1043,9 +1042,7 @@ export function createWorkbookCoordinator(
 		},
 
 		insertReference(sourceSheetKey, targetSheetKey, range) {
-			return toPublicReferenceResult(
-				tryInsertReference(sourceSheetKey, targetSheetKey, range),
-			);
+			return tryInsertReference(sourceSheetKey, targetSheetKey, range);
 		},
 
 		setReferenceHighlight(sheetKey, range) {
@@ -1055,23 +1052,23 @@ export function createWorkbookCoordinator(
 		clearReferenceHighlights,
 
 		insertRows(sheetKey, atIndex, count) {
-			return toPublicStructuralChange(tryInsertRows(sheetKey, atIndex, count));
+			return tryInsertRows(sheetKey, atIndex, count);
 		},
 
 		deleteRows(sheetKey, atIndex, count) {
-			return toPublicStructuralChange(tryDeleteRows(sheetKey, atIndex, count));
+			return tryDeleteRows(sheetKey, atIndex, count);
 		},
 
 		setRowOrder(sheetKey, indexOrder) {
-			return toPublicStructuralChange(trySetRowOrder(sheetKey, indexOrder));
+			return trySetRowOrder(sheetKey, indexOrder);
 		},
 
 		undo() {
-			return toPublicStructuralChange(tryUndo());
+			return tryUndo();
 		},
 
 		redo() {
-			return toPublicStructuralChange(tryRedo());
+			return tryRedo();
 		},
 
 		canUndo() {

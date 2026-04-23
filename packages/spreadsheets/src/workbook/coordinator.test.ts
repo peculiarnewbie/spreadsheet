@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as HyperFormulaNS from "hyperformula";
 import type { CellRange, CellValue, SheetController } from "../types";
 import { setInternalTraceSink, type InternalTraceEvent } from "../internal/trace";
+import { Result, isApplied, isNoop, type OperationOutcome, type ResultLike } from "../internal/result";
 import { createWorkbookCoordinator, getWorkbookCoordinatorInternals } from "./coordinator";
 
 const HyperFormula = HyperFormulaNS.HyperFormula ?? HyperFormulaNS.default;
@@ -42,6 +43,27 @@ function createStubController(
 		getCanvasElement: () => null,
 		...overrides,
 	};
+}
+
+function expectAppliedResult<T, Reason extends string, Error>(
+	result: ResultLike<OperationOutcome<T, Reason>, Error>,
+): T {
+	expect(Result.isOk(result)).toBe(true);
+	if (!Result.isOk(result) || !isApplied(result.value)) {
+		throw new Error("Expected applied Result");
+	}
+	return result.value.value;
+}
+
+function expectNoopResult<T, Reason extends string, Error>(
+	result: ResultLike<OperationOutcome<T, Reason>, Error>,
+	reason: Reason,
+) {
+	expect(Result.isOk(result)).toBe(true);
+	if (!Result.isOk(result) || !isNoop(result.value)) {
+		throw new Error("Expected noop Result");
+	}
+	expect(result.value.reason).toBe(reason);
 }
 
 describe("workbook coordinator", () => {
@@ -105,7 +127,7 @@ describe("workbook coordinator", () => {
 			end: { row: 1, col: 0 },
 		});
 
-		expect(inserted).toBe(true);
+		expectAppliedResult(inserted);
 		expect(insertedTexts).toEqual(["Data!A1:A2"]);
 		expect(highlightedRanges).toEqual([{
 			start: { row: 0, col: 0 },
@@ -126,7 +148,7 @@ describe("workbook coordinator", () => {
 		internals.attachDataGetter(data.sheetKey, () => dataCells);
 		internals.attachDataGetter(summary.sheetKey, () => summaryCells);
 
-		const insertChange = coordinator.insertRows(data.sheetKey, 1, 1)!;
+		const insertChange = expectAppliedResult(coordinator.insertRows(data.sheetKey, 1, 1));
 		const insertData = insertChange.snapshots.find((entry) => entry.sheetKey === "data")!;
 		const insertSummary = insertChange.snapshots.find((entry) => entry.sheetKey === "summary");
 
@@ -143,16 +165,16 @@ describe("workbook coordinator", () => {
 		dataCells = insertData.cells;
 		summaryCells = insertSummary!.cells;
 
-		const deleteChange = coordinator.deleteRows(data.sheetKey, 1, 1)!;
+		const deleteChange = expectAppliedResult(coordinator.deleteRows(data.sheetKey, 1, 1));
 		const deleteSummary = deleteChange.snapshots.find((entry) => entry.sheetKey === "summary");
 		expect(deleteSummary?.cells[0]?.[1]).toBe("=SUM(Data!B1:B3)");
 		expect(deleteSummary?.cells[1]?.[1]).toBe("=Data!B2");
 
-		const undoChange = coordinator.undo()!;
+		const undoChange = expectAppliedResult(coordinator.undo());
 		const undoSummary = undoChange.snapshots.find((entry) => entry.sheetKey === "summary");
 		expect(undoSummary?.cells[0]?.[1]).toBe("=SUM(Data!B1:B4)");
 
-		const redoChange = coordinator.redo()!;
+		const redoChange = expectAppliedResult(coordinator.redo());
 		const redoSummary = redoChange.snapshots.find((entry) => entry.sheetKey === "summary");
 		expect(redoSummary?.cells[0]?.[1]).toBe("=SUM(Data!B1:B3)");
 	});
@@ -170,7 +192,7 @@ describe("workbook coordinator", () => {
 		internals.attachDataGetter(data.sheetKey, () => dataCells);
 		internals.attachDataGetter(summary.sheetKey, () => summaryCells);
 
-		const change = coordinator.setRowOrder(data.sheetKey, [2, 1, 0])!;
+		const change = expectAppliedResult(coordinator.setRowOrder(data.sheetKey, [2, 1, 0]));
 		const nextData = change.snapshots.find((entry) => entry.sheetKey === "data")!.cells;
 		const nextSummary = change.snapshots.find((entry) => entry.sheetKey === "summary")!.cells;
 
@@ -179,14 +201,14 @@ describe("workbook coordinator", () => {
 		expect(hf.getSheetValues(internals.getFormulaEngineConfig(summary).sheetId!)[0]?.[1]).toBe("Gamma");
 	});
 
-	it("returns null and emits noop traces for invalid structural operations", () => {
+	it("returns noop Results and emits noop traces for invalid structural operations", () => {
 		resetTraceSink = setInternalTraceSink((event) => traceEvents.push(event));
 		const coordinator = createWorkbookCoordinator({
 			engine: HyperFormula.buildEmpty({ licenseKey: "gpl-v3" }),
 		});
 		coordinator.bindSheet({ sheetKey: "data", formulaName: "Data" });
 
-		expect(coordinator.insertRows("data", 0, 0)).toBeNull();
+		expectNoopResult(coordinator.insertRows("data", 0, 0), "invalid-count");
 		expect(traceEvents.some((event) =>
 			event.operation === "insertRows" &&
 			event.status === "noop" &&
@@ -194,7 +216,7 @@ describe("workbook coordinator", () => {
 		)).toBe(true);
 	});
 
-	it("returns false and emits noop traces when no active reference source exists", () => {
+	it("returns noop Results and emits noop traces when no active reference source exists", () => {
 		resetTraceSink = setInternalTraceSink((event) => traceEvents.push(event));
 		const coordinator = createWorkbookCoordinator({
 			engine: HyperFormula.buildEmpty({ licenseKey: "gpl-v3" }),
@@ -207,7 +229,7 @@ describe("workbook coordinator", () => {
 			end: { row: 0, col: 0 },
 		});
 
-		expect(inserted).toBe(false);
+		expectNoopResult(inserted, "missing-controller");
 		expect(traceEvents.some((event) =>
 			event.operation === "insertReference" &&
 			event.status === "noop" &&
@@ -226,7 +248,8 @@ describe("workbook coordinator", () => {
 			throw new Error("snapshot build failed");
 		}) as typeof hf.getSheetSerialized;
 
-		expect(coordinator.insertRows("data", 0, 1)).toBeNull();
+		const result = coordinator.insertRows("data", 0, 1);
+		expect(Result.isError(result)).toBe(true);
 		expect(traceEvents.some((event) =>
 			event.operation === "buildSnapshots" &&
 			event.status === "err" &&

@@ -53,6 +53,7 @@ export interface SheetStore {
 	rowCount(): number;
 	colCount(): number;
 	rowIds(): number[];
+	dataRevision(): number;
 	selection(): Selection;
 	editMode(): EditModeState | null;
 	columnWidths(): Map<string, number>;
@@ -68,6 +69,7 @@ export interface SheetStore {
 	setColumnWidth(columnId: string, width: number): void;
 	setRowHeight(rowId: number, height: number): void;
 	resizeGrid(rowCount: number, colCount: number): void;
+	restoreSnapshot(cells: CellValue[][], rowIds: number[]): void;
 	insertRows(atIndex: number, count: number): void;
 	deleteRows(atIndex: number, count: number): CellValue[][];
 	getRowIdAtPhysicalRow(row: number): number | null;
@@ -129,6 +131,11 @@ export function createSheetStore(
 	const [rowHeights, setRowHeights] = createSignal<Map<number, number>>(new Map());
 	const [historyState, setHistory] = createSignal<HistoryStack>(createHistory());
 	const [hasPendingRowOp, setHasPendingRowOp] = createSignal(false);
+	const [dataRevision, setDataRevision] = createSignal(0);
+
+	function bumpDataRevision() {
+		setDataRevision((value) => value + 1);
+	}
 
 	/** Internal: splice empty rows into the cells array and update dimensions. */
 	function _insertRows(atIndex: number, count: number) {
@@ -166,6 +173,7 @@ export function createSheetStore(
 			return next;
 		});
 		setHasPendingRowOp(true);
+		bumpDataRevision();
 	}
 
 	/** Internal: splice rows out of the cells array, update dimensions, return removed data. */
@@ -207,6 +215,7 @@ export function createSheetStore(
 			return next;
 		});
 		setHasPendingRowOp(true);
+		bumpDataRevision();
 
 		return removedData;
 	}
@@ -226,6 +235,7 @@ export function createSheetStore(
 				}
 			}),
 		);
+		bumpDataRevision();
 	}
 
 	function _restoreAllCells(snapshot: CellValue[][]) {
@@ -237,6 +247,7 @@ export function createSheetStore(
 				}
 			}),
 		);
+		bumpDataRevision();
 	}
 
 	/** Internal: apply a row operation (used during undo/redo). */
@@ -277,6 +288,7 @@ export function createSheetStore(
 			}),
 		);
 		setRowIds([...nextOrder]);
+		bumpDataRevision();
 	}
 
 	return {
@@ -287,6 +299,7 @@ export function createSheetStore(
 		rowCount: () => dimensions().rowCount,
 		colCount: () => dimensions().colCount,
 		rowIds,
+		dataRevision,
 
 		selection,
 		editMode,
@@ -309,9 +322,11 @@ export function createSheetStore(
 					draftRow[col] = value;
 				}),
 			);
+			bumpDataRevision();
 		},
 
 		setCells(mutations: Array<{ row: number; col: number; value: CellValue }>) {
+			if (mutations.length === 0) return;
 			setCells(
 				produce((draft) => {
 					for (const m of mutations) {
@@ -326,6 +341,7 @@ export function createSheetStore(
 					}
 				}),
 			);
+			bumpDataRevision();
 		},
 
 		reorderRows,
@@ -386,6 +402,22 @@ export function createSheetStore(
 				setNextRowId(startId + additional);
 				return next;
 			});
+			bumpDataRevision();
+		},
+
+		restoreSnapshot(nextCells: CellValue[][], nextRowIds: number[]) {
+			setDimensions({ rowCount: nextCells.length, colCount: dimensions().colCount });
+			setCells(
+				produce((draft) => {
+					draft.length = 0;
+					for (const row of nextCells) {
+						draft.push([...row]);
+					}
+				}),
+			);
+			setRowIds([...nextRowIds]);
+			setHasPendingRowOp(false);
+			bumpDataRevision();
 		},
 
 		insertRows(atIndex: number, count: number) {
@@ -476,6 +508,7 @@ export function createSheetStore(
 						}
 					}),
 				);
+				bumpDataRevision();
 			}
 
 			if (result.rowReorder) {
@@ -530,6 +563,7 @@ export function createSheetStore(
 						}
 					}),
 				);
+				bumpDataRevision();
 			}
 
 			if (result.rowReorder) {

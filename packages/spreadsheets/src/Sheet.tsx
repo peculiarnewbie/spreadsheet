@@ -22,12 +22,15 @@ export function Sheet(props: SheetProps) {
 		props.workbook
 			? workbookInternals()!.getFormulaEngineConfig(props.workbook)
 			: props.formulaEngine;
-	const formulaBridge = createFormulaBridge(resolvedFormulaEngine());
+	const formulaBridgeResult = createFormulaBridge(resolvedFormulaEngine());
+	if (Result.isError(formulaBridgeResult)) {
+		throw new Error(formulaBridgeResult.error.message);
+	}
+	const formulaBridge = formulaBridgeResult.value;
 	const showFormulaBar = () =>
 		props.showFormulaBar ?? Boolean(props.formulaEngine || props.workbook);
 	const showReferenceHeaders = () =>
 		props.showReferenceHeaders ?? Boolean(props.formulaEngine || props.workbook);
-	const workbookDataGetter = () => props.data;
 	let attachedController: SheetController | null = null;
 
 	function syncFormulaBridge() {
@@ -47,6 +50,7 @@ export function Sheet(props: SheetProps) {
 	// ── Create Store ───────────────────────────────────────────────────────
 
 	const store = createSheetStore(props.data, props.columns);
+	const workbookDataGetter = () => store.cells.map((row) => [...row]);
 
 	// ── Data Reconciliation ────────────────────────────────────────────────
 

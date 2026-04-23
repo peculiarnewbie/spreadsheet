@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { createFormulaBridge } from "./bridge";
+import { createFormulaBridge, type FormulaBridge } from "./bridge";
 import type { CellValue } from "../types";
+import { Result } from "../internal/result";
 
 // ── Mock Engine ──────────────────────────────────────────────────────────────
 // Reusable mock HyperFormula that evaluates simple =REF+REF and =REF*N formulas.
@@ -11,6 +12,14 @@ function columnLettersToIndex(input: string): number {
 		index = index * 26 + (char.charCodeAt(0) - 64);
 	}
 	return index - 1;
+}
+
+function createTestBridge(engine: ReturnType<typeof createMockEngine>): FormulaBridge {
+	const result = createFormulaBridge({ instance: engine, sheetName: "Test" });
+	if (!Result.isOk(result) || !result.value) {
+		throw new Error("Expected formula bridge");
+	}
+	return result.value;
 }
 
 function parseCellReference(reference: string) {
@@ -120,7 +129,7 @@ function createMockEngine() {
 describe("formula bridge must be synced after row insert", () => {
 	it("getDisplayValue returns a number, not literal formula text, after row insert", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		const data: CellValue[][] = [
 			[1, 2, "=A1+B1"],
@@ -155,7 +164,7 @@ describe("formula bridge must be synced after row insert", () => {
 
 	it("display values reflect the new layout, not stale cache from old positions", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		// Hero sheet scenario: D column has row-sum formulas
 		const data: CellValue[][] = [
@@ -186,7 +195,7 @@ describe("formula bridge must be synced after row insert", () => {
 		// Website bug: user types =C4 in B5 after inserting a row.
 		// HF was never synced, so =C4 evaluates against old grid → gets "Sum" instead of 31.
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		const data: CellValue[][] = [
 			["Engineering", 48, 52, "=B1+C1"],
@@ -228,7 +237,7 @@ describe("formula bridge must be synced after row insert", () => {
 describe("syncAll produces correct HF state after structural changes", () => {
 	it("formula added to a new row after sync evaluates correctly", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		bridge.syncAll([
 			[10, 20],
@@ -251,7 +260,7 @@ describe("syncAll produces correct HF state after structural changes", () => {
 
 	it("multiple inserts + sync keeps all formulas coherent", () => {
 		const engine = createMockEngine();
-		const bridge = createFormulaBridge({ instance: engine, sheetName: "Test" })!;
+		const bridge = createTestBridge(engine);
 
 		bridge.syncAll([
 			[1, "=A1+A2"],  // row 0: 1+2=3
