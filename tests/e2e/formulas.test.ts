@@ -7,7 +7,7 @@ import {
 	clickCell,
 	doubleClickCell,
 	typeIntoCell,
-	getPage,
+	withSheetCtrlMaybe,
 } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
@@ -27,16 +27,16 @@ describe("formulas", () => {
 
 	it("displays computed formula results", async () => {
 		// C1 = A1 + B1 = 10 + 20 = 30
-		const display = await getPage().evaluate(
-			() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(0, 2),
+		const display = await withSheetCtrlMaybe(
+			(ctrl) => ctrl?.getDisplayCellValue(0, 2),
 		);
 		expect(display).toBe(30);
 	});
 
 	it("computes SUM correctly", async () => {
 		// C4 = SUM(C1:C3) = 30 + 70 + 110 = 210
-		const display = await getPage().evaluate(
-			() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(3, 2),
+		const display = await withSheetCtrlMaybe(
+			(ctrl) => ctrl?.getDisplayCellValue(3, 2),
 		);
 		expect(display).toBe(210);
 	});
@@ -57,8 +57,8 @@ describe("formulas", () => {
 		await typeIntoCell(sh, "100");
 
 		// C1 = A1 + B1 should now be 100 + 20 = 120
-		const display = await getPage().evaluate(
-			() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(0, 2),
+		const display = await withSheetCtrlMaybe(
+			(ctrl) => ctrl?.getDisplayCellValue(0, 2),
 		);
 		expect(display).toBe(120);
 	});

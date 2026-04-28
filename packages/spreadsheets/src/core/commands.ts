@@ -1,4 +1,5 @@
 import type { CellMutation, CellValue, ColumnDef } from "../types";
+import { type ColumnIndex, type PhysicalRowIndex, type RowId, type VisualRowIndex, physicalRow, toNumber } from "./brands";
 import { iterateRange, normalizeRange } from "./selection";
 import type { SheetStore } from "./state";
 
@@ -14,14 +15,14 @@ export function deleteSelectedCells(
 	for (const range of sel.ranges) {
 		const nr = normalizeRange(range);
 		for (const addr of iterateRange(nr)) {
-			const colDef = columns[addr.col];
+			const colDef = columns[toNumber(addr.col)];
 			if (!colDef || colDef.editable === false) continue;
 
-			const oldValue = store.cells[addr.row]?.[addr.col] ?? null;
+			const oldValue = store.cells[toNumber(addr.row)]?.[toNumber(addr.col)] ?? null;
 			if (oldValue === null) continue;
 
 			mutations.push({
-				address: addr,
+				address: { row: physicalRow(toNumber(addr.row)), col: addr.col },
 				columnId: colDef.id,
 				oldValue,
 				newValue: null,
@@ -61,26 +62,26 @@ export function applyMutations(
 
 export function commitCellEdit(
 	store: SheetStore,
-	row: number,
-	col: number,
+	row: PhysicalRowIndex,
+	col: ColumnIndex,
 	newValue: CellValue,
 	columns: ColumnDef[],
 	options?: {
-		viewAddress?: { row: number; col: number };
-		rowId?: number;
+		viewAddress?: { row: VisualRowIndex; col: ColumnIndex };
+		rowId?: RowId;
 		source?: CellMutation["source"];
 	},
 ): CellMutation | null {
-	const colDef = columns[col];
+	const colDef = columns[toNumber(col)];
 	if (!colDef) return null;
 
-	const oldValue = store.cells[row]?.[col] ?? null;
+	const oldValue = store.cells[row]?.[toNumber(col)] ?? null;
 	if (oldValue === newValue) return null;
 
 	const mutation: CellMutation = {
 		address: { row, col },
-		viewAddress: options?.viewAddress,
-		rowId: options?.rowId,
+		...(options?.viewAddress ? { viewAddress: options.viewAddress } : {}),
+		...(options?.rowId !== undefined ? { rowId: options.rowId } : {}),
 		columnId: colDef.id,
 		oldValue,
 		newValue,

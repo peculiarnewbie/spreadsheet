@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { clickContextMenuItem, getPage, getStagehand, navigateTo } from "./setup";
+import { clickContextMenuItem, getPage, getStagehand, getWorkbookData, navigateTo, withWorkbookCtrl } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
 function sheetCellLocator(sheetTestId: string, row: number, col: number) {
@@ -109,11 +109,11 @@ describe("cross-sheet workbook mode", () => {
 	});
 
 	it("evaluates cross-sheet formulas on initial load", async () => {
-		const total = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getDisplayCellValue(0, 1),
+		const total = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getDisplayCellValue(0, 1),
 		);
-		const first = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getDisplayCellValue(1, 1),
+		const first = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getDisplayCellValue(1, 1),
 		);
 
 		expect(total).toBe(60);
@@ -121,27 +121,24 @@ describe("cross-sheet workbook mode", () => {
 	});
 
 	it("propagates source-sheet edits to dependent sheets", async () => {
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.setCellValue(0, 1, 100);
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.setCellValue(0, 1, 100));
 
-		const total = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getDisplayCellValue(0, 1),
+		const total = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getDisplayCellValue(0, 1),
 		);
 		expect(total).toBe(150);
 	});
 
 	it("inserts cross-sheet references on click", async () => {
-		await getPage().evaluate(() => {
-			const ctrl = (window as any).__WORKBOOK_CONTROLLERS__.summary;
-			ctrl.startEditing(3, 1);
-			ctrl.setActiveEditorValue("=");
+		await withWorkbookCtrl("summary", (ctrl) => {
+			ctrl?.startEditing(3, 1);
+			ctrl?.setActiveEditorValue("=");
 		});
 
 		await sheetCellLocator("sheet-data", 0, 0).click();
 
-		const text = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getEditorText(),
+		const text = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getEditorText(),
 		);
 		const highlightCount = await getPage().locator('[data-testid="sheet-data"] .se-reference-rect').count();
 
@@ -150,16 +147,15 @@ describe("cross-sheet workbook mode", () => {
 	});
 
 	it("inserts cross-sheet ranges on drag and clears remote highlights on mouseup", async () => {
-		await getPage().evaluate(() => {
-			const ctrl = (window as any).__WORKBOOK_CONTROLLERS__.summary;
-			ctrl.startEditing(3, 1);
-			ctrl.setActiveEditorValue("=");
+		await withWorkbookCtrl("summary", (ctrl) => {
+			ctrl?.startEditing(3, 1);
+			ctrl?.setActiveEditorValue("=");
 		});
 
 		await dragWithinSheet("sheet-data", 0, 0, 1, 1);
 
-		const text = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getEditorText(),
+		const text = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getEditorText(),
 		);
 		const highlightCount = await getPage().locator('[data-testid="sheet-data"] .se-reference-rect').count();
 
@@ -168,61 +164,44 @@ describe("cross-sheet workbook mode", () => {
 	});
 
 	it("clears click-based remote highlights on commit", async () => {
-		await getPage().evaluate(() => {
-			const ctrl = (window as any).__WORKBOOK_CONTROLLERS__.summary;
-			ctrl.startEditing(3, 1);
-			ctrl.setActiveEditorValue("=");
+		await withWorkbookCtrl("summary", (ctrl) => {
+			ctrl?.startEditing(3, 1);
+			ctrl?.setActiveEditorValue("=");
 		});
 
 		await sheetCellLocator("sheet-data", 0, 0).click();
 		expect(await getPage().locator('[data-testid="sheet-data"] .se-reference-rect').count()).toBe(1);
 
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.summary?.commitActiveEditor();
-		});
+		await withWorkbookCtrl("summary", (ctrl) => ctrl?.commitActiveEditor());
 
 		expect(await getPage().locator('[data-testid="sheet-data"] .se-reference-rect').count()).toBe(0);
 	});
 
 	it("rewrites cross-sheet formulas through workbook row insert/delete snapshots", async () => {
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.insertRows(1, 1);
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.insertRows(1, 1));
 
-		const afterInsert = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_DATA__.summary,
-		);
+		const afterInsert = await getWorkbookData("summary");
 		expect(afterInsert[0][1]).toBe("=SUM(Data!B1:B4)");
 		expect(afterInsert[2][1]).toBe("=Data!B3");
 
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.deleteRows(1, 1);
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.deleteRows(1, 1));
 
-		const afterDelete = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_DATA__.summary,
-		);
+		const afterDelete = await getWorkbookData("summary");
 		expect(afterDelete[0][1]).toBe("=SUM(Data!B1:B3)");
 		expect(afterDelete[2][1]).toBe("=Data!B2");
 	});
 
 	it("uses workbook-backed undo and redo for structural history", async () => {
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.insertRows(1, 1);
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.insertRows(1, 1));
 
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.undo();
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.undo());
 
-		let summary = await getPage().evaluate(() => (window as any).__WORKBOOK_DATA__.summary);
+		let summary = await getWorkbookData("summary");
 		expect(summary[0][1]).toBe("=SUM(Data!B1:B3)");
 
-		await getPage().evaluate(() => {
-			(window as any).__WORKBOOK_CONTROLLERS__.data?.redo();
-		});
+		await withWorkbookCtrl("data", (ctrl) => ctrl?.redo());
 
-		summary = await getPage().evaluate(() => (window as any).__WORKBOOK_DATA__.summary);
+		summary = await getWorkbookData("summary");
 		expect(summary[0][1]).toBe("=SUM(Data!B1:B4)");
 	});
 
@@ -230,9 +209,9 @@ describe("cross-sheet workbook mode", () => {
 		await rightClickSheetHeader("sheet-data", "Value");
 		await clickContextMenuItem(sh, "Sort Z-A");
 
-		const data = await getPage().evaluate(() => (window as any).__WORKBOOK_DATA__.data);
-		const total = await getPage().evaluate(
-			() => (window as any).__WORKBOOK_CONTROLLERS__.summary?.getDisplayCellValue(0, 1),
+		const data = await getWorkbookData("data");
+		const total = await withWorkbookCtrl("summary",
+			(ctrl) => ctrl?.getDisplayCellValue(0, 1),
 		);
 
 		expect(data[0][0]).toBe("Gamma");

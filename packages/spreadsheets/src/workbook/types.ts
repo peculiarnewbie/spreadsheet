@@ -1,4 +1,5 @@
 import type { CellRange, CellValue, SheetController } from "../types";
+import type { PhysicalRowIndex } from "../core/brands";
 import type { WorkbookCoordinatorError } from "../internal/errors";
 import type { OperationOutcome, ResultLike } from "../internal/result";
 
@@ -18,9 +19,9 @@ export interface WorkbookSheetBinding {
 }
 
 export type WorkbookStructuralOrigin =
-	| { type: "insertRows"; sheetKey: string; atIndex: number; count: number }
-	| { type: "deleteRows"; sheetKey: string; atIndex: number; count: number }
-	| { type: "setRowOrder"; sheetKey: string; indexOrder: number[] }
+	| { type: "insertRows"; sheetKey: string; atIndex: PhysicalRowIndex; count: number }
+	| { type: "deleteRows"; sheetKey: string; atIndex: PhysicalRowIndex; count: number }
+	| { type: "setRowOrder"; sheetKey: string; indexOrder: PhysicalRowIndex[] }
 	| { type: "undo" }
 	| { type: "redo" };
 
@@ -59,9 +60,9 @@ export interface WorkbookCoordinator {
 	setReferenceHighlight(sheetKey: string, range: CellRange | null): void;
 	clearReferenceHighlights(): void;
 
-	insertRows(sheetKey: string, atIndex: number, count: number): WorkbookStructuralResult;
-	deleteRows(sheetKey: string, atIndex: number, count: number): WorkbookStructuralResult;
-	setRowOrder(sheetKey: string, indexOrder: number[]): WorkbookStructuralResult;
+	insertRows(sheetKey: string, atIndex: PhysicalRowIndex, count: number): WorkbookStructuralResult;
+	deleteRows(sheetKey: string, atIndex: PhysicalRowIndex, count: number): WorkbookStructuralResult;
+	setRowOrder(sheetKey: string, indexOrder: PhysicalRowIndex[]): WorkbookStructuralResult;
 
 	undo(): WorkbookHistoryResult;
 	redo(): WorkbookHistoryResult;

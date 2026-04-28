@@ -1,4 +1,5 @@
 import { TaggedError } from "./result";
+import type { ColumnIndex, FormulaSheetId, PhysicalRowIndex } from "../core/brands";
 
 export class FormulaSheetResolutionError extends TaggedError("FormulaSheetResolutionError")<{
 	operation: string;
@@ -17,7 +18,7 @@ export class FormulaEngineSubscriptionError extends TaggedError("FormulaEngineSu
 export class FormulaEngineSyncError extends TaggedError("FormulaEngineSyncError")<{
 	operation: "syncAll";
 	formulaName: string;
-	sheetId: number;
+	sheetId: FormulaSheetId;
 	message: string;
 	cause?: unknown;
 }>() {}
@@ -25,9 +26,9 @@ export class FormulaEngineSyncError extends TaggedError("FormulaEngineSyncError"
 export class FormulaCellUpdateError extends TaggedError("FormulaCellUpdateError")<{
 	operation: "setCell";
 	formulaName: string;
-	sheetId: number;
-	row: number;
-	col: number;
+	sheetId: FormulaSheetId;
+	row: PhysicalRowIndex;
+	col: ColumnIndex;
 	message: string;
 	cause?: unknown;
 }>() {}
@@ -35,9 +36,9 @@ export class FormulaCellUpdateError extends TaggedError("FormulaCellUpdateError"
 export class FormulaDisplayValueError extends TaggedError("FormulaDisplayValueError")<{
 	operation: "getDisplayValue";
 	formulaName: string;
-	sheetId: number;
-	row: number;
-	col: number;
+	sheetId: FormulaSheetId;
+	row: PhysicalRowIndex;
+	col: ColumnIndex;
 	message: string;
 	cause?: unknown;
 }>() {}
@@ -45,7 +46,7 @@ export class FormulaDisplayValueError extends TaggedError("FormulaDisplayValueEr
 export class FormulaRowOrderError extends TaggedError("FormulaRowOrderError")<{
 	operation: "setRowOrder";
 	formulaName: string;
-	sheetId: number;
+	sheetId: FormulaSheetId;
 	indexOrder: number[];
 	message: string;
 	cause?: unknown;
@@ -72,14 +73,14 @@ export class WorkbookDuplicateFormulaNameError extends TaggedError("WorkbookDupl
 
 export class WorkbookSnapshotBuildError extends TaggedError("WorkbookSnapshotBuildError")<{
 	sheetKey: string;
-	sheetId: number;
+	sheetId: FormulaSheetId;
 	message: string;
 	cause?: unknown;
 }>() {}
 
 export class WorkbookSnapshotRestoreError extends TaggedError("WorkbookSnapshotRestoreError")<{
 	sheetKey: string;
-	sheetId: number;
+	sheetId: FormulaSheetId;
 	message: string;
 	cause?: unknown;
 }>() {}
@@ -96,10 +97,10 @@ export class WorkbookStructuralOperationError extends TaggedError("WorkbookStruc
 	operation: string;
 	sheetKey?: string;
 	formulaName?: string;
-	sheetId?: number;
-	atIndex?: number;
+	sheetId?: FormulaSheetId;
+	atIndex?: PhysicalRowIndex;
 	count?: number;
-	indexOrder?: number[];
+	indexOrder?: PhysicalRowIndex[];
 	message: string;
 	cause?: unknown;
 }>() {}

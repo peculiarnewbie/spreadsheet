@@ -1,6 +1,7 @@
 import type { ColumnDef } from "../types";
 import { DEFAULT_COL_WIDTH, DEFAULT_MIN_COL_WIDTH } from "../types";
 
+
 export function clampColumnWidth(column: ColumnDef, width: number): number {
 	const minWidth = column.minWidth ?? DEFAULT_MIN_COL_WIDTH;
 	const maxWidth = column.maxWidth ?? Number.POSITIVE_INFINITY;
@@ -44,7 +45,7 @@ export function recordToMap<TKey extends string | number>(
 	if (!record) return next;
 
 	for (const [key, value] of Object.entries(record)) {
-		next.set(keyTransform ? keyTransform(key) : key as TKey, value);
+		next.set(keyTransform ? keyTransform(key) : (key as unknown as TKey), value);
 	}
 
 	return next;

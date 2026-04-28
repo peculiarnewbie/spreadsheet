@@ -1,25 +1,27 @@
 import type {
 	AutoFillMode,
-	CellAddress,
 	CellMutation,
 	CellRange,
 	CellValue,
 	ColumnDef,
 	FillAxis,
 	FillPreview,
+	PhysicalCellAddress,
 	Selection,
+	VisualCellAddress,
 } from "../types";
+import { columnIdx, physicalRow, toNumber, visualRow } from "./brands";
 import { normalizeRange, rangeContains } from "./selection";
 import { isFormulaValue, shiftFormulaByDelta } from "../formula/references";
 
 export function getAutoFillSourceRange(selection: Selection): CellRange | null {
 	if (selection.ranges.length !== 1) return null;
-	return normalizeRange(selection.ranges[0]!);
+	return normalizeRange(selection.ranges[0] as CellRange);
 }
 
 export function computeFillPreview(
 	sourceRange: CellRange,
-	dragTarget: CellAddress,
+	dragTarget: VisualCellAddress,
 	axis: FillAxis,
 ): FillPreview | null {
 	if (axis !== "vertical") return null;
@@ -28,9 +30,9 @@ export function computeFillPreview(
 
 	// Clamp the column to the source range so the preview persists even when
 	// the cursor drifts horizontally outside the selected columns.
-	const clampedTarget: CellAddress = {
+	const clampedTarget: VisualCellAddress = {
 		row: dragTarget.row,
-		col: Math.max(source.start.col, Math.min(dragTarget.col, source.end.col)),
+		col: columnIdx(Math.max(source.start.col, Math.min(dragTarget.col, source.end.col))),
 	};
 
 	if (rangeContains(source, clampedTarget)) return null;
@@ -40,7 +42,7 @@ export function computeFillPreview(
 			axis,
 			source,
 			extension: {
-				start: { row: source.end.row + 1, col: source.start.col },
+				start: { row: visualRow(toNumber(source.end.row) + 1), col: source.start.col },
 				end: { row: clampedTarget.row, col: source.end.col },
 			},
 			direction: "down",
@@ -53,7 +55,7 @@ export function computeFillPreview(
 			source,
 			extension: {
 				start: { row: clampedTarget.row, col: source.start.col },
-				end: { row: source.start.row - 1, col: source.end.col },
+				end: { row: visualRow(toNumber(source.start.row) - 1), col: source.end.col },
 			},
 			direction: "up",
 		};
@@ -90,8 +92,8 @@ export function buildVerticalFillMutations(
 
 	const source = normalizeRange(sourceRange);
 	const extension = normalizeRange(preview.extension);
-	const width = source.end.col - source.start.col + 1;
-	const height = source.end.row - source.start.row + 1;
+	const width = toNumber(extension.end.col) - toNumber(source.start.col) + 1;
+	const height = toNumber(source.end.row) - toNumber(source.start.row) + 1;
 
 	if (
 		extension.start.col !== source.start.col ||
@@ -103,10 +105,10 @@ export function buildVerticalFillMutations(
 	}
 
 	const columnStates = Array.from({ length: width }, (_, offset) => {
-		const col = source.start.col + offset;
+		const col = columnIdx(toNumber(source.start.col) + offset);
 		const seedValues = Array.from(
 			{ length: height },
-			(_, rowOffset) => currentCells[source.start.row + rowOffset]?.[col] ?? null,
+			(_, rowOffset) => currentCells[toNumber(source.start.row) + rowOffset]?.[toNumber(col)] ?? null,
 		);
 
 		return {
@@ -117,18 +119,18 @@ export function buildVerticalFillMutations(
 
 	const mutations: CellMutation[] = [];
 
-	for (let row = extension.start.row; row <= extension.end.row; row++) {
-		for (let col = extension.start.col; col <= extension.end.col; col++) {
-			const columnOffset = col - source.start.col;
-			const column = columns[col];
+	for (let r = toNumber(extension.start.row); r <= toNumber(extension.end.row); r++) {
+		for (let c = toNumber(extension.start.col); c <= toNumber(extension.end.col); c++) {
+			const columnOffset = c - toNumber(source.start.col);
+			const column = columns[c];
 			if (!column || column.editable === false) continue;
 
-			const destination = { row, col };
-			if (rangeContains(source, destination)) continue;
+			const destination: PhysicalCellAddress = { row: physicalRow(r), col: columnIdx(c) };
+			if (rangeContains(source, { row: visualRow(r), col: columnIdx(c) })) continue;
 
 			const columnState = columnStates[columnOffset]!;
-			const sourceRow = mapDestinationRowToSourceRow(source, preview, row);
-			const sourceValue = currentCells[sourceRow]?.[col] ?? null;
+			const sourceRow = mapDestinationRowToSourceRow(source, preview, r);
+			const sourceValue = currentCells[sourceRow]?.[c] ?? null;
 			const nextValue = computeFilledValue(
 				columnState.mode,
 				columnState.seedValues,
@@ -136,9 +138,9 @@ export function buildVerticalFillMutations(
 				source,
 				preview,
 				sourceRow,
-				row,
+				r,
 			);
-			const oldValue = currentCells[row]?.[col] ?? null;
+			const oldValue = currentCells[r]?.[c] ?? null;
 			if (oldValue === nextValue) continue;
 
 			mutations.push({

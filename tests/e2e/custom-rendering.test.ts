@@ -200,7 +200,7 @@ describe("custom rendering hooks", () => {
 		// though the inner span is replaced by the user's pill.
 		await clickCell(sh, 2, 2);
 		const selection = await getPage().evaluate(
-			() => (window as any).__SHEET_CONTROLLER__?.getSelection(),
+			() => window.__SHEET_CONTROLLER__?.getSelection(),
 		);
 		expect(selection?.anchor).toEqual({ row: 2, col: 2 });
 	});

@@ -1,5 +1,5 @@
 import { Stagehand } from "@browserbasehq/stagehand";
-import type { CellMutation, CellValue } from "peculiar-sheets";
+import type { CellMutation, CellValue, SheetController, WorkbookStructuralChange } from "peculiar-sheets";
 
 interface LocatorLike {
 	click(options?: { clickCount?: number }): Promise<void>;
@@ -84,6 +84,44 @@ export async function navigateTo(_sh: Stagehand, route: string) {
 	await page.waitForSelector('[data-testid="harness"]');
 	// Wait for SolidJS to hydrate and expose globals
 	await poll(() => window.__SHEET_DATA__ !== undefined);
+}
+
+// ── Data helpers ──────────────────────────────────────────────────────────
+
+// ── Typed controller evaluate helpers ─────────────────────────────────────
+
+/** Run a callback with typed access to `window.__SHEET_CONTROLLER__`. */
+export function withSheetCtrl<T>(fn: (ctrl: SheetController) => T): Promise<T> {
+	return getPage().evaluate((fnStr: string) => {
+		const ctrl = window.__SHEET_CONTROLLER__;
+		if (!ctrl) throw new Error("SheetController not available");
+		return (0, eval)(`(${fnStr})`)(ctrl);
+	}, fn.toString());
+}
+
+/** Run a callback with typed access to `window.__SHEET_CONTROLLER__` (allows null). */
+export function withSheetCtrlMaybe<T>(fn: (ctrl: SheetController | null) => T): Promise<T> {
+	return getPage().evaluate((fnStr: string) => {
+		return (0, eval)(`(${fnStr})`)(window.__SHEET_CONTROLLER__);
+	}, fn.toString());
+}
+
+/** Run a callback with typed access to `window.__WORKBOOK_CONTROLLERS__[sheetKey]` (allows null). */
+export function withWorkbookCtrl<T>(sheetKey: string, fn: (ctrl: SheetController | null) => T): Promise<T> {
+	return getPage().evaluate((args: { key: string; fn: string }) => {
+		const ctrl = window.__WORKBOOK_CONTROLLERS__[args.key] ?? null;
+		return (0, eval)(`(${args.fn})`)(ctrl);
+	}, { key: sheetKey, fn: fn.toString() });
+}
+
+/** Read the current workbook data for a sheet. */
+export function getWorkbookData(sheetKey: string): Promise<CellValue[][]> {
+	return getPage().evaluate((key: string) => window.__WORKBOOK_DATA__[key]!, sheetKey);
+}
+
+/** Read the workbook structural change log. */
+export function getWorkbookChanges(): Promise<WorkbookStructuralChange[]> {
+	return getPage().evaluate(() => window.__WORKBOOK_CHANGES__);
 }
 
 // ── Data helpers ──────────────────────────────────────────────────────────

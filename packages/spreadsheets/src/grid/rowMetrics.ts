@@ -1,8 +1,10 @@
+import { type VisualRowIndex, visualRow } from "../core/brands";
+
 export interface RowMetrics {
-	getRowHeight(visualRow: number): number;
-	getRowTop(visualRow: number): number;
+	getRowHeight(visualRow: VisualRowIndex): number;
+	getRowTop(visualRow: VisualRowIndex): number;
 	getTotalHeight(): number;
-	getVisualRowAtOffset(offsetY: number): number;
+	getVisualRowAtOffset(offsetY: number): VisualRowIndex;
 }
 
 export interface RowMetricsSnapshot extends RowMetrics {
@@ -14,7 +16,7 @@ export interface RowMetricsSnapshot extends RowMetrics {
 export function buildRowMetrics(
 	rowCount: number,
 	defaultRowHeight: number,
-	getRowHeightOverride: (visualRow: number) => number | undefined,
+	getRowHeightOverride: (visualRow: VisualRowIndex) => number | undefined,
 ): RowMetricsSnapshot {
 	const heights: number[] = new Array(rowCount);
 	const offsets: number[] = new Array(rowCount);
@@ -22,25 +24,25 @@ export function buildRowMetrics(
 
 	for (let row = 0; row < rowCount; row++) {
 		offsets[row] = runningTop;
-		const nextHeight = getRowHeightOverride(row) ?? defaultRowHeight;
+		const nextHeight = getRowHeightOverride(visualRow(row)) ?? defaultRowHeight;
 		heights[row] = nextHeight;
 		runningTop += nextHeight;
 	}
 
-	function getRowHeight(visualRow: number): number {
+	function getRowHeight(visualRow: VisualRowIndex): number {
 		return heights[visualRow] ?? defaultRowHeight;
 	}
 
-	function getRowTop(visualRow: number): number {
+	function getRowTop(visualRow: VisualRowIndex): number {
 		if (visualRow <= 0) return 0;
 		if (visualRow >= rowCount) return runningTop;
 		return offsets[visualRow] ?? 0;
 	}
 
-	function getVisualRowAtOffset(offsetY: number): number {
-		if (rowCount === 0) return 0;
-		if (offsetY <= 0) return 0;
-		if (offsetY >= runningTop) return rowCount - 1;
+	function getVisualRowAtOffset(offsetY: number): VisualRowIndex {
+		if (rowCount === 0) return visualRow(0);
+		if (offsetY <= 0) return visualRow(0);
+		if (offsetY >= runningTop) return visualRow(rowCount - 1);
 
 		let low = 0;
 		let high = rowCount - 1;
@@ -55,11 +57,11 @@ export function buildRowMetrics(
 			} else if (offsetY >= bottom) {
 				low = mid + 1;
 			} else {
-				return mid;
+				return visualRow(mid);
 			}
 		}
 
-		return Math.min(Math.max(low, 0), rowCount - 1);
+		return visualRow(Math.min(Math.max(low, 0), rowCount - 1));
 	}
 
 	return {

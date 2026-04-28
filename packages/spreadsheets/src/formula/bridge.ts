@@ -18,6 +18,7 @@ import {
 	type OperationOutcome,
 	type ResultLike,
 } from "../internal/result";
+import { type ColumnIndex, type FormulaSheetId, type PhysicalRowIndex, formulaSheetId, toNumber } from "../core/brands";
 import { errorTraceContext, withTraceContext } from "../internal/trace";
 import { isFormulaValue } from "./references";
 
@@ -55,11 +56,11 @@ export interface FormulaBridge {
 	/** Sync all cell data to the formula engine. */
 	syncAll(cells: CellValue[][]): FormulaBridgeOperationResult;
 	/** Update a single cell in the formula engine. */
-	setCell(row: number, col: number, value: CellValue): FormulaBridgeOperationResult;
+	setCell(row: PhysicalRowIndex, col: ColumnIndex, value: CellValue): FormulaBridgeOperationResult;
 	/** Reorder rows structurally in the formula engine. */
 	setRowOrder(newRowOrder: number[]): FormulaBridgeOperationResult<FormulaBridgeRowOrderNoopReason>;
 	/** Get the display value for a cell (evaluated formula result or raw value). */
-	getDisplayValue(row: number, col: number, rawValue: CellValue): CellValue;
+	getDisplayValue(row: PhysicalRowIndex, col: ColumnIndex, rawValue: CellValue): CellValue;
 	/** Check if a cell value is a formula. */
 	isFormula(value: CellValue): boolean;
 	/** Cleanup listeners. */
@@ -105,7 +106,7 @@ export function createFormulaBridge(
 	if (!config) return Result.ok(null);
 
 	const hf = config.instance as HyperFormulaLike;
-	let resolvedSheetId: number | null = config.sheetId ?? null;
+	let resolvedSheetId: FormulaSheetId | null = config.sheetId ?? null;
 	const sheetName = config.sheetName ?? "Sheet1";
 	const [revision, setRevision] = createSignal(0);
 
@@ -141,7 +142,7 @@ export function createFormulaBridge(
 		}
 
 		if (existingIdResult.value !== undefined) {
-			resolvedSheetId = existingIdResult.value;
+			resolvedSheetId = formulaSheetId(existingIdResult.value);
 			trace.ok({ sheetId: resolvedSheetId });
 			return Result.ok(applied(resolvedSheetId));
 		}
@@ -179,7 +180,7 @@ export function createFormulaBridge(
 			return Result.ok(noop("sheet-unavailable"));
 		}
 
-		resolvedSheetId = addedIdResult.value;
+		resolvedSheetId = formulaSheetId(addedIdResult.value);
 		trace.ok({ sheetId: resolvedSheetId });
 		return Result.ok(applied(resolvedSheetId));
 	}
@@ -256,13 +257,13 @@ export function createFormulaBridge(
 			return;
 		}
 
-		const sheetId = sheetIdResult.value.value;
+		const sheetId = formulaSheetId(sheetIdResult.value.value);
 		const affectsSheet = changes.some((change) => {
 			if (typeof change !== "object" || change === null) return false;
 			if (!("address" in change)) return true;
 
 			const address = (change as { address?: { sheet?: unknown } }).address;
-			return address?.sheet === sheetId;
+			return address?.sheet === toNumber(sheetId);
 		});
 
 		if (affectsSheet) {
@@ -289,11 +290,11 @@ export function createFormulaBridge(
 			return sheetIdResult;
 		}
 
-		const sheetId = sheetIdResult.value.value;
+		const sheetId = formulaSheetId(sheetIdResult.value.value);
 		const result = Result.try({
 			try: () => {
 				hf.setSheetContent(
-					sheetId,
+					toNumber(sheetId),
 					cells.map((row) => row.map((value) => normalizeEngineValue(value))),
 				);
 			},
@@ -312,16 +313,16 @@ export function createFormulaBridge(
 		}
 
 		bumpRevision();
-		trace.ok({ sheetId });
+		trace.ok({ sheetId: toNumber(sheetId) });
 		return Result.ok(applied(sheetId));
 	}
 
-	function trySetCell(row: number, col: number, value: CellValue): FormulaBridgeOperationResult {
+	function trySetCell(row: PhysicalRowIndex, col: ColumnIndex, value: CellValue): FormulaBridgeOperationResult {
 		const trace = withTraceContext({
 			module: "formula-bridge",
 			operation: "setCell",
 			phase: "mutation",
-			context: { formulaName: sheetName, row, col },
+			context: { formulaName: sheetName, row: toNumber(row), col: toNumber(col) },
 		});
 		trace.start();
 
@@ -335,18 +336,18 @@ export function createFormulaBridge(
 			return sheetIdResult;
 		}
 
-		const sheetId = sheetIdResult.value.value;
+		const fSheetId = formulaSheetId(sheetIdResult.value.value);
 		const result = Result.try({
 			try: () => {
 				hf.setCellContents(
-					{ sheet: sheetId, row, col },
+					{ sheet: toNumber(fSheetId), row: toNumber(row), col: toNumber(col) },
 					normalizeEngineValue(value),
 				);
 			},
 			catch: (cause) => new FormulaCellUpdateError({
 				operation: "setCell",
 				formulaName: sheetName,
-				sheetId,
+				sheetId: fSheetId,
 				row,
 				col,
 				message: getErrorMessage(cause),
@@ -360,8 +361,8 @@ export function createFormulaBridge(
 		}
 
 		bumpRevision();
-		trace.ok({ sheetId });
-		return Result.ok(applied(sheetId));
+		trace.ok({ sheetId: toNumber(fSheetId) });
+		return Result.ok(applied(toNumber(fSheetId)));
 	}
 
 	function trySetRowOrder(
@@ -385,13 +386,13 @@ export function createFormulaBridge(
 			return sheetIdResult;
 		}
 
-		const sheetId = sheetIdResult.value.value;
+		const fSheetId = formulaSheetId(sheetIdResult.value.value);
 		const canSetRowOrderResult = Result.try({
-			try: () => hf.isItPossibleToSetRowOrder(sheetId, newRowOrder),
+			try: () => hf.isItPossibleToSetRowOrder(toNumber(fSheetId), newRowOrder),
 			catch: (cause) => new FormulaRowOrderError({
 				operation: "setRowOrder",
 				formulaName: sheetName,
-				sheetId,
+				sheetId: fSheetId,
 				indexOrder: [...newRowOrder],
 				message: getErrorMessage(cause),
 				cause,
@@ -402,18 +403,18 @@ export function createFormulaBridge(
 			return canSetRowOrderResult;
 		}
 		if (!canSetRowOrderResult.value) {
-			trace.noop({ reason: "engine-rejected", sheetId });
+			trace.noop({ reason: "engine-rejected", sheetId: toNumber(fSheetId) });
 			return Result.ok(noop("engine-rejected"));
 		}
 
 		const rowOrderResult = Result.try({
 			try: () => {
-				hf.setRowOrder(sheetId, newRowOrder);
+				hf.setRowOrder(toNumber(fSheetId), newRowOrder);
 			},
 			catch: (cause) => new FormulaRowOrderError({
 				operation: "setRowOrder",
 				formulaName: sheetName,
-				sheetId,
+				sheetId: fSheetId,
 				indexOrder: [...newRowOrder],
 				message: getErrorMessage(cause),
 				cause,
@@ -425,13 +426,13 @@ export function createFormulaBridge(
 		}
 
 		bumpRevision();
-		trace.ok({ sheetId });
-		return Result.ok(applied(sheetId));
+		trace.ok({ sheetId: toNumber(fSheetId) });
+		return Result.ok(applied(toNumber(fSheetId)));
 	}
 
 	function tryGetDisplayValue(
-		row: number,
-		col: number,
+		row: PhysicalRowIndex,
+		col: ColumnIndex,
 		rawValue: CellValue,
 	): ResultLike<OperationOutcome<CellValue, FormulaBridgeNoopReason>, FormulaBridgeError> {
 		const sheetIdResult = tryResolveSheetId();
@@ -442,13 +443,13 @@ export function createFormulaBridge(
 			return Result.ok(noop("sheet-unavailable"));
 		}
 
-		const sheetId = sheetIdResult.value.value;
+		const fSheetId = formulaSheetId(sheetIdResult.value.value);
 		return Result.try({
-			try: () => applied(coerceDisplayValue(hf.getCellValue({ sheet: sheetId, row, col }), rawValue)),
+			try: () => applied(coerceDisplayValue(hf.getCellValue({ sheet: toNumber(fSheetId), row: toNumber(row), col: toNumber(col) }), rawValue)),
 			catch: (cause) => new FormulaDisplayValueError({
 				operation: "getDisplayValue",
 				formulaName: sheetName,
-				sheetId,
+				sheetId: fSheetId,
 				row,
 				col,
 				message: getErrorMessage(cause),
@@ -475,7 +476,7 @@ export function createFormulaBridge(
 			return trySyncAll(cells);
 		},
 
-		setCell(row: number, col: number, value: CellValue) {
+		setCell(row: PhysicalRowIndex, col: ColumnIndex, value: CellValue) {
 			return trySetCell(row, col, value);
 		},
 
@@ -483,7 +484,7 @@ export function createFormulaBridge(
 			return trySetRowOrder(newRowOrder);
 		},
 
-		getDisplayValue(row: number, col: number, rawValue: CellValue): CellValue {
+		getDisplayValue(row: PhysicalRowIndex, col: ColumnIndex, rawValue: CellValue): CellValue {
 			if (!bridge.isFormula(rawValue)) return rawValue;
 
 			const result = tryGetDisplayValue(row, col, rawValue);
@@ -492,7 +493,7 @@ export function createFormulaBridge(
 					module: "formula-bridge",
 					operation: "getDisplayValue",
 					phase: "read",
-					context: { formulaName: sheetName, row, col },
+					context: { formulaName: sheetName, row: toNumber(row), col: toNumber(col) },
 				}).err(errorTraceContext(result.error));
 				return rawValue;
 			}

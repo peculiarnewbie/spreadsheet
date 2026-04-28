@@ -3,6 +3,7 @@ import type { ColumnDef, SortState } from "../types";
 import { GROUP_HEADER_HEIGHT, HEADER_HEIGHT } from "../types";
 import { getEffectiveColumnWidth } from "../core/sizing";
 import { columnIndexToLetters } from "../formula/references";
+import { type ColumnIndex, columnIdx } from "../core/brands";
 
 interface GridHeaderProps {
 	columns: ColumnDef[];
@@ -15,7 +16,7 @@ interface GridHeaderProps {
 	lastPinnedIndex: number;
 	activeResizeColumnId: string | null;
 	onColumnResizeStart: (columnId: string, event: MouseEvent) => void;
-	onColumnHeaderMouseDown?: (col: number, event: MouseEvent) => void;
+	onColumnHeaderMouseDown?: (col: ColumnIndex, event: MouseEvent) => void;
 }
 
 interface ColumnGroup {
@@ -36,8 +37,7 @@ function buildColumnGroups(columns: ColumnDef[]): ColumnGroup[] {
 	let currentGroupId: string | null = null;
 	let currentGroup: ColumnGroup | null = null;
 
-	for (let i = 0; i < columns.length; i++) {
-		const col = columns[i]!;
+	for (const [i, col] of columns.entries()) {
 		if (col.groupId && col.groupId === currentGroupId && currentGroup) {
 			currentGroup.span++;
 		} else if (col.groupId) {
@@ -90,7 +90,7 @@ export default function GridHeader(props: GridHeaderProps) {
 				});
 				colIdx += group.span;
 			} else {
-				const col = props.columns[colIdx]!;
+				const col = props.columns[colIdx] as ColumnDef;
 				items.push({
 					type: "empty",
 					width: getColWidth(col),
@@ -152,7 +152,7 @@ export default function GridHeader(props: GridHeaderProps) {
 										left: isPinned() ? `${props.pinnedLeftOffsets?.[index()] ?? 0}px` : undefined,
 									}}
 									data-col-index={index()}
-									onMouseDown={(e) => props.onColumnHeaderMouseDown?.(index(), e)}
+								onMouseDown={(e) => props.onColumnHeaderMouseDown?.(columnIdx(index()), e)}
 								>
 									{columnIndexToLetters(index())}
 								</div>
@@ -242,7 +242,7 @@ export default function GridHeader(props: GridHeaderProps) {
 									cursor: isSortable ? "pointer" : undefined,
 								}}
 								data-col-index={index()}
-								onMouseDown={(e) => props.onColumnHeaderMouseDown?.(index(), e)}
+								onMouseDown={(e) => props.onColumnHeaderMouseDown?.(columnIdx(index()), e)}
 							>
 								<span class="se-header-cell__label">
 									{col.header}{getSortIndicator(col)}

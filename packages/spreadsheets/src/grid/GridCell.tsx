@@ -1,17 +1,18 @@
 import { Show } from "solid-js";
 import type { JSX } from "solid-js";
 import type { CellRenderContext, CellStyle, CellValue } from "../types";
+import { type ColumnIndex, type VisualRowIndex } from "../core/brands";
 
 interface GridCellProps {
 	/** Raw cell value (pre-format). Passed to renderCell / title hooks. */
 	rawValue: CellValue;
 	/** Text to render in the default inner span (already passed through formatValue or the default). */
 	formattedText: string;
-	/** Physical row index (post-sort). */
-	row: number;
+	/** Visual row index. */
+	row: VisualRowIndex;
 	width: number;
 	height: number;
-	colIndex: number;
+	colIndex: ColumnIndex;
 	readOnly?: boolean;
 	pinnedLeft?: number;
 	isLastPinned?: boolean;

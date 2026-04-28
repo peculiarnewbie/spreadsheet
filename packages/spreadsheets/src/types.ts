@@ -1,18 +1,33 @@
 import type { JSX } from "solid-js";
 import type { WorkbookSheetBinding } from "./workbook/types";
+import type {
+	ColumnIndex,
+	FormulaSheetId,
+	PhysicalRowIndex,
+	RowId,
+	VisualRowIndex,
+} from "./core/brands";
 
 // ── Cell Primitives ──────────────────────────────────────────────────────────
 
 export type CellValue = string | number | boolean | null;
 
-export interface CellAddress {
-	row: number;
-	col: number;
+export interface VisualCellAddress {
+	row: VisualRowIndex;
+	col: ColumnIndex;
 }
 
+export interface PhysicalCellAddress {
+	row: PhysicalRowIndex;
+	col: ColumnIndex;
+}
+
+/** @deprecated Use VisualCellAddress or PhysicalCellAddress instead. */
+export type CellAddress = VisualCellAddress;
+
 export interface CellRange {
-	start: CellAddress;
-	end: CellAddress;
+	start: VisualCellAddress;
+	end: VisualCellAddress;
 }
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -21,11 +36,11 @@ export interface Selection {
 	/** All selected ranges (supports multi-range via ctrl+click). */
 	ranges: CellRange[];
 	/** Where selection started. */
-	anchor: CellAddress;
+	anchor: VisualCellAddress;
 	/** Where selection ends (for shift-extend). */
-	focus: CellAddress;
+	focus: VisualCellAddress;
 	/** Cell currently in edit mode, if any. */
-	editing: CellAddress | null;
+	editing: VisualCellAddress | null;
 }
 
 // ── Sorting ──────────────────────────────────────────────────────────────────
@@ -150,9 +165,9 @@ export interface ColumnDef {
 // ── Events ───────────────────────────────────────────────────────────────────
 
 export interface CellMutation {
-	address: CellAddress;
-	viewAddress?: CellAddress;
-	rowId?: number;
+	address: PhysicalCellAddress;
+	viewAddress?: VisualCellAddress;
+	rowId?: RowId;
 	columnId: string;
 	oldValue: CellValue;
 	newValue: CellValue;
@@ -162,9 +177,9 @@ export interface CellMutation {
 export interface RowReorderMutation {
 	columnId: string;
 	direction: SortDirection | null;
-	oldOrder: number[];
-	newOrder: number[];
-	indexOrder: number[];
+	oldOrder: RowId[];
+	newOrder: RowId[];
+	indexOrder: PhysicalRowIndex[];
 	source: "sort" | "undo" | "redo";
 }
 
@@ -183,13 +198,13 @@ export interface FillDragState {
 	axis: FillAxis;
 	source: CellRange;
 	handle: "bottom-right";
-	origin: CellAddress;
-	current: CellAddress;
+	origin: VisualCellAddress;
+	current: VisualCellAddress;
 	preview: FillPreview | null;
 }
 
 export interface EditModeState {
-	address: CellAddress;
+	address: VisualCellAddress;
 	initialValue: CellValue;
 }
 
@@ -211,7 +226,7 @@ export interface ScrollPosition {
 
 export interface SheetSizingState {
 	columnWidths: Map<string, number>;
-	rowHeights: Map<number, number>;
+	rowHeights: Map<RowId, number>;
 }
 
 export type ResizeAxis = "column" | "row";
@@ -220,7 +235,8 @@ export type ResizeMode = "onEnd" | "onChange";
 
 export interface ResizeSessionState {
 	axis: ResizeAxis;
-	targetId: string | number;
+	rowTargetId?: RowId;
+	columnTargetId?: string;
 	startPointerOffset: number;
 	startSize: number;
 	currentDelta: number;
@@ -269,7 +285,7 @@ export interface SheetCustomization {
 	 * editing. Receives the editing cell address and the clicked cell address.
 	 * Return `null` to use the default behavior (bare A1 reference).
 	 */
-	getReferenceText?: (editingAddress: CellAddress, clickedAddress: CellAddress) => string | null;
+	getReferenceText?: (editingAddress: PhysicalCellAddress, clickedAddress: PhysicalCellAddress) => string | null;
 	/**
 	 * Translate a formula string for display in the formula bar.
 	 * Called when showing the formula of the selected cell.
@@ -314,7 +330,7 @@ export interface SheetProps {
 	rowSizing?: Record<number, number>;
 	onRowSizingChange?: (next: Record<number, number>) => void;
 	onColumnResize?: (columnId: string, width: number) => void;
-	onRowResize?: (rowId: number, height: number) => void;
+	onRowResize?: (rowId: RowId, height: number) => void;
 	onSort?: (columnId: string, direction: SortDirection | null) => void;
 	onSortChange?: (state: SortState | null) => void;
 	/** Called when rows are inserted. The host should update its data array accordingly. */
@@ -337,13 +353,13 @@ export interface SheetProps {
 	 * Called before default mousedown handling in Grid.
 	 * Return `true` to suppress default behavior (selection, edit commit, etc.).
 	 */
-	onCellPointerDown?: (address: CellAddress, event: MouseEvent) => boolean;
+	onCellPointerDown?: (address: VisualCellAddress, event: MouseEvent) => boolean;
 
 	/**
 	 * Called during mousemove when the mouse is over a cell.
 	 * Return `true` to suppress default behavior.
 	 */
-	onCellPointerMove?: (address: CellAddress, event: MouseEvent) => boolean;
+	onCellPointerMove?: (address: VisualCellAddress, event: MouseEvent) => boolean;
 
 	/** Imperative handle callback — receives the controller on mount. */
 	ref?: (controller: SheetController) => void;
@@ -396,7 +412,7 @@ export interface SheetController {
 export interface FormulaEngineConfig {
 	/** HyperFormula instance (typed as unknown to avoid hard dependency). */
 	instance: unknown;
-	sheetId?: number;
+	sheetId?: FormulaSheetId;
 	sheetName?: string;
 }
 

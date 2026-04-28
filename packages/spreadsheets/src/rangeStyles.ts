@@ -1,7 +1,8 @@
-import type { CellAddress, CellRange, CellStyle } from "./types";
+import type { CellRange, CellStyle, VisualCellAddress } from "./types";
+import { toNumber } from "./core/brands";
 
 /** A cell position or rectangular range that a style rule applies to. */
-export type StyleTarget = CellAddress | CellRange;
+export type StyleTarget = VisualCellAddress | CellRange;
 
 /** A declarative rule: one or more targets sharing a single style. */
 export interface RangeStyleRule {
@@ -31,13 +32,13 @@ function normalize(t: StyleTarget): NormalizedRange {
 	if (isRange(t)) {
 		const { start, end } = t;
 		return {
-			startRow: Math.min(start.row, end.row),
-			endRow: Math.max(start.row, end.row),
-			startCol: Math.min(start.col, end.col),
-			endCol: Math.max(start.col, end.col),
+			startRow: Math.min(toNumber(start.row), toNumber(end.row)),
+			endRow: Math.max(toNumber(start.row), toNumber(end.row)),
+			startCol: Math.min(toNumber(start.col), toNumber(end.col)),
+			endCol: Math.max(toNumber(start.col), toNumber(end.col)),
 		};
 	}
-	return { startRow: t.row, endRow: t.row, startCol: t.col, endCol: t.col };
+	return { startRow: toNumber(t.row), endRow: toNumber(t.row), startCol: toNumber(t.col), endCol: toNumber(t.col) };
 }
 
 /**

@@ -4,6 +4,8 @@
     "build": "pnpm -r build",
     "dev": "pnpm -r --parallel dev",
     "build:lib": "pnpm --filter peculiar-sheets build",
+    "typecheck": "pnpm -r typecheck",
+    "typecheck:lib": "pnpm --filter peculiar-sheets typecheck",
     "build:www": "pnpm --filter solid-sheet-www build",
     "publish:lib": "pnpm --filter peculiar-sheets run publish:npm",
     "e2e": "bun run tests/e2e/run.ts",

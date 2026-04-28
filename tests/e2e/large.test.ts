@@ -6,6 +6,7 @@ import {
 	doubleClickCell,
 	typeIntoCell,
 	getPage,
+	withSheetCtrlMaybe,
 } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
@@ -58,7 +59,7 @@ describe("large dataset", () => {
 	});
 
 	it("renders without crashing", async () => {
-		const data = await getPage().evaluate(() => (window as any).__SHEET_DATA__);
+		const data = await getPage().evaluate(() => window.__SHEET_DATA__);
 		expect(data.length).toBe(10_000);
 	});
 
@@ -66,9 +67,7 @@ describe("large dataset", () => {
 		const flowStart = performance.now();
 
 		await measure("scrollToCell(500,0)", () =>
-			getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__?.scrollToCell(500, 0);
-			}),
+			withSheetCtrlMaybe((ctrl) => ctrl?.scrollToCell(500, 0)),
 		);
 
 		const rowVisible = await measure("row 501 in DOM", () => waitForRowInDom(500));
@@ -94,9 +93,7 @@ describe("large dataset", () => {
 
 	it("maintains data integrity after scrolling", async () => {
 		// Scroll to top and verify untouched data
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__?.scrollToCell(0, 0);
-		});
+		await withSheetCtrlMaybe((ctrl) => ctrl?.scrollToCell(0, 0));
 		await getPage().waitForTimeout(200);
 
 		// Row 0, Col 0 should be 0 * 20 + 0 = 0

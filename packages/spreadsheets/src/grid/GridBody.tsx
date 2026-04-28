@@ -1,14 +1,15 @@
 import { For, Show } from "solid-js";
-import type { CellAddress, CellValue, ColumnDef } from "../types";
+import type { CellValue, ColumnDef, PhysicalCellAddress, VisualCellAddress } from "../types";
+import { type ColumnIndex, type VisualRowIndex, columnIdx, toNumber, visualRow } from "../core/brands";
 import { useSheetCustomization } from "../customization";
 import { getEffectiveColumnWidth } from "../core/sizing";
 import { defaultFormatCellValue } from "../core/formatting";
 import GridCell from "./GridCell";
 import type { RowMetrics } from "./rowMetrics";
 
-function addressMatchesCurrent(addr: CellAddress, current: CellAddress | null): boolean {
+function addressMatchesCurrent(addr: VisualCellAddress, current: PhysicalCellAddress | null): boolean {
 	if (!current) return false;
-	return current.row === addr.row && current.col === addr.col;
+	return toNumber(current.row) === toNumber(addr.row) && toNumber(current.col) === toNumber(addr.col);
 }
 
 interface GridBodyProps {
@@ -17,28 +18,28 @@ interface GridBodyProps {
 	rowMetrics: RowMetrics;
 	rowGutterWidth: number;
 	showReferenceHeaders: boolean;
-	getRowHeaderIndex: (visualRow: number) => number;
-	getRowHeaderTooltip?: (visualRow: number, backingRow: number) => string | null;
-	onRowResizeStart?: (row: number, event: MouseEvent) => void;
+	getRowHeaderIndex: (visualRow: VisualRowIndex) => number;
+	getRowHeaderTooltip?: (visualRow: VisualRowIndex, backingRow: number) => string | null;
+	onRowResizeStart?: (row: VisualRowIndex, event: MouseEvent) => void;
 	activeResizeRow?: number | null;
 	/** Visible rows from the virtualizer. */
 	virtualRows: Array<{ index: number; start: number; size: number }>;
 	/** Total rendered height for sizing. */
 	totalHeight: number;
-	getDisplayValue: (row: number, col: number) => CellValue;
+	getDisplayValue: (row: VisualRowIndex, col: ColumnIndex) => CellValue;
 	/** Raw cell value (pre-formula-eval, pre-formatValue). Used for renderCell + title hooks. */
-	getRawValue: (row: number, col: number) => CellValue;
+	getRawValue: (row: VisualRowIndex, col: ColumnIndex) => CellValue;
 	/** Visual address of the currently-editing cell (if any). Used to set `isEditing` on custom renderers. */
-	editingAddress: CellAddress | null;
-	onCellMouseDown: (addr: CellAddress, event: MouseEvent) => void;
-	onCellMouseEnter?: (addr: CellAddress, event: MouseEvent) => void;
-	onRowHeaderMouseDown?: (row: number, event: MouseEvent) => void;
-	onCellDblClick: (addr: CellAddress) => void;
+	editingAddress: VisualCellAddress | null;
+	onCellMouseDown: (addr: VisualCellAddress, event: MouseEvent) => void;
+	onCellMouseEnter?: (addr: VisualCellAddress, event: MouseEvent) => void;
+	onRowHeaderMouseDown?: (row: VisualRowIndex, event: MouseEvent) => void;
+	onCellDblClick: (addr: VisualCellAddress) => void;
 	pinnedLeftOffsets: number[];
 	lastPinnedIndex: number;
 	readOnly?: boolean;
 	searchMatchSet: Set<string>;
-	searchCurrentAddress: CellAddress | null;
+	searchCurrentAddress: PhysicalCellAddress | null;
 }
 
 export default function GridBody(props: GridBodyProps) {
@@ -62,8 +63,9 @@ export default function GridBody(props: GridBodyProps) {
 					const rowIdx = () => virtualRow.index;
 					const rowHeight = () => virtualRow.size;
 					const rowTop = () => virtualRow.start;
-					const rowHeaderIndex = () => props.getRowHeaderIndex(rowIdx());
-					const rowHeaderTooltip = () => props.getRowHeaderTooltip?.(rowIdx(), rowHeaderIndex()) ?? null;
+					const vRow = () => visualRow(rowIdx());
+					const rowHeaderIndex = () => props.getRowHeaderIndex(vRow());
+					const rowHeaderTooltip = () => props.getRowHeaderTooltip?.(vRow(), rowHeaderIndex()) ?? null;
 					return (
 						<div
 							class="se-row"
@@ -89,7 +91,7 @@ export default function GridBody(props: GridBodyProps) {
 										height: `${rowHeight()}px`,
 									}}
 									title={rowHeaderTooltip() ?? undefined}
-									onMouseDown={(e) => props.onRowHeaderMouseDown?.(rowIdx(), e)}
+									onMouseDown={(e) => props.onRowHeaderMouseDown?.(vRow(), e)}
 								>
 									<Show when={customization?.getRowHeaderSublabel?.(rowHeaderIndex())}>
 										{(sub) => <span class="se-row-header-sublabel">{sub()}</span>}
@@ -101,47 +103,48 @@ export default function GridBody(props: GridBodyProps) {
 											onMouseDown={(e) => {
 												e.preventDefault();
 												e.stopPropagation();
-												props.onRowResizeStart?.(rowIdx(), e);
+												props.onRowResizeStart?.(vRow(), e);
 											}}
 										/>
 									</Show>
 								</div>
 							</Show>
-							<For each={props.columns}>
-								{(col, colIdx) => {
-									const addr = (): CellAddress => ({ row: rowIdx(), col: colIdx() });
-									const rawValue = () => props.getRawValue(rowIdx(), colIdx());
-									const displayValue = () => props.getDisplayValue(rowIdx(), colIdx());
-									const formattedText = () =>
-										col.formatValue
-											? col.formatValue(displayValue(), { row: rowIdx(), col: colIdx() })
-											: defaultFormatCellValue(displayValue());
-									const titleOverride = () =>
-										col.getCellTitle?.(rawValue(), { row: rowIdx(), col: colIdx() });
-									const isEditing = () =>
-										props.editingAddress?.row === rowIdx() &&
-										props.editingAddress?.col === colIdx();
+						<For each={props.columns}>
+							{(col, colIdx) => {
+								const cidx = () => columnIdx(colIdx());
+								const addr = (): VisualCellAddress => ({ row: vRow(), col: cidx() });
+								const rawValue = () => props.getRawValue(vRow(), cidx());
+								const displayValue = () => props.getDisplayValue(vRow(), cidx());
+								const formattedText = () =>
+									col.formatValue
+										? col.formatValue(displayValue(), { row: rowIdx(), col: toNumber(cidx()) })
+										: defaultFormatCellValue(displayValue());
+								const titleOverride = () =>
+									col.getCellTitle?.(rawValue(), { row: rowIdx(), col: toNumber(cidx()) });
+								const isEditing = () =>
+									props.editingAddress?.row === vRow() &&
+									props.editingAddress?.col === cidx();
 
 									return (
-										<GridCell
-											rawValue={rawValue()}
-											formattedText={formattedText()}
-											row={rowIdx()}
-											width={getColWidth(col)}
-											height={rowHeight()}
-											colIndex={colIdx()}
+									<GridCell
+										rawValue={rawValue()}
+										formattedText={formattedText()}
+										row={vRow()}
+										width={getColWidth(col)}
+										height={rowHeight()}
+										colIndex={cidx()}
 											readOnly={props.readOnly ?? false}
 											pinnedLeft={props.pinnedLeftOffsets?.[colIdx()] ?? -1}
 											isLastPinned={colIdx() === props.lastPinnedIndex}
-											searchMatch={props.searchMatchSet.has(`${rowIdx()},${colIdx()}`)}
+											searchMatch={props.searchMatchSet.has(`${rowIdx()},${toNumber(cidx())}`)}
 											searchCurrent={addressMatchesCurrent(addr(), props.searchCurrentAddress)}
 											isEditing={isEditing()}
 											{...(titleOverride() !== undefined ? { title: titleOverride() as string } : {})}
 											{...(col.renderCell ? { renderCell: col.renderCell } : {})}
-											{...(customization?.getCellClass ? { customClass: customization.getCellClass(rowIdx, colIdx()) } : {})}
-											{...(customization?.getCellStyle
-												? (() => {
-														const s = customization.getCellStyle!(rowIdx(), colIdx());
+									{...(customization?.getCellClass ? { customClass: customization.getCellClass(rowIdx(), toNumber(cidx())) } : {})}
+									{...(customization?.getCellStyle
+										? (() => {
+												const s = customization.getCellStyle!(rowIdx(), toNumber(cidx()));
 														return s ? { inlineStyle: s } : {};
 													})()
 												: {})}

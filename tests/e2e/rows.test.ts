@@ -6,7 +6,7 @@ import {
 	getRowCount,
 	press,
 	focusGrid,
-	getPage,
+	withSheetCtrl,
 } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
@@ -36,9 +36,7 @@ describe("row operations", () => {
 		expect(await getRowCount(sh)).toBe(3);
 
 		// Insert 1 row at index 1 (above "beta")
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.insertRows(1, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.insertRows(1, 1));
 
 		expect(await getRowCount(sh)).toBe(4);
 
@@ -58,9 +56,7 @@ describe("row operations", () => {
 		expect(await getRowCount(sh)).toBe(3);
 
 		// Insert 1 row at index 2 (below "beta")
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 		expect(await getRowCount(sh)).toBe(4);
 
@@ -79,9 +75,7 @@ describe("row operations", () => {
 		expect(await getRowCount(sh)).toBe(3);
 
 		// Delete row 1 ("beta")
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.deleteRows(1, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.deleteRows(1, 1));
 
 		expect(await getRowCount(sh)).toBe(2);
 
@@ -96,9 +90,7 @@ describe("row operations", () => {
 
 	it("undoes insert row with Ctrl+Z", async () => {
 		// Insert a row at index 1
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.insertRows(1, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.insertRows(1, 1));
 		expect(await getRowCount(sh)).toBe(4);
 
 		// Undo
@@ -116,9 +108,7 @@ describe("row operations", () => {
 
 	it("undoes delete row with Ctrl+Z and restores data", async () => {
 		// Delete row 1 ("beta", 20)
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.deleteRows(1, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.deleteRows(1, 1));
 		expect(await getRowCount(sh)).toBe(2);
 		expect(await getCellValue(sh, 1, 0)).toBe("gamma");
 
@@ -140,9 +130,7 @@ describe("row operations", () => {
 
 	it("redoes insert row with Ctrl+Y after undo", async () => {
 		// Insert row at index 1
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.insertRows(1, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.insertRows(1, 1));
 		expect(await getRowCount(sh)).toBe(4);
 
 		// Undo
@@ -160,9 +148,7 @@ describe("row operations", () => {
 
 	it("redoes delete row with Ctrl+Y after undo", async () => {
 		// Delete row 0 ("alpha")
-		await getPage().evaluate(() => {
-			(window as any).__SHEET_CONTROLLER__.deleteRows(0, 1);
-		});
+		await withSheetCtrl((ctrl) => ctrl.deleteRows(0, 1));
 		expect(await getRowCount(sh)).toBe(2);
 
 		// Undo

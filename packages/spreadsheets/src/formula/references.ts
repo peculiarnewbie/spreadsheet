@@ -1,4 +1,5 @@
-import type { CellAddress, CellRange, CellValue } from "../types";
+import type { CellRange, CellValue, VisualCellAddress } from "../types";
+import { toNumber } from "../core/brands";
 import { normalizeRange } from "../core/selection";
 
 const A1_REFERENCE_PATTERN = /(?<![A-Za-z0-9_!])(\$?[A-Z]{1,3}\$?\d+)(?::(\$?[A-Z]{1,3}\$?\d+))?/g;
@@ -27,8 +28,8 @@ export function lettersToColumnIndex(text: string): number {
 	return result - 1;
 }
 
-export function addressToA1(address: CellAddress): string {
-	return `${columnIndexToLetters(address.col)}${address.row + 1}`;
+export function addressToA1(address: VisualCellAddress): string {
+	return `${columnIndexToLetters(toNumber(address.col))}${toNumber(address.row) + 1}`;
 }
 
 export function rangeToA1(range: CellRange): string {

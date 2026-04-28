@@ -1,6 +1,7 @@
-import type { CellRange, CellValue, EditModeState, FormulaEngineConfig, SheetController } from "../types";
+import type { CellRange, CellValue, EditModeState, FormulaEngineConfig, SheetController, VisualCellAddress } from "../types";
 import { normalizeRange } from "../core/selection";
 import { addressToA1 } from "../formula/references";
+import { type FormulaSheetId, type PhysicalRowIndex, formulaSheetId, toNumber } from "../core/brands";
 import {
 	WorkbookBindingMismatchError,
 	WorkbookDuplicateFormulaNameError,
@@ -62,7 +63,7 @@ interface WorkbookHistoryEntry {
 interface WorkbookSheetRuntime {
 	sheetKey: string;
 	formulaName: string;
-	sheetId: number;
+	sheetId: FormulaSheetId;
 	controller: SheetController | null;
 	getCells: (() => CellValue[][]) | null;
 	lastKnownCells: CellValue[][];
@@ -71,7 +72,7 @@ interface WorkbookSheetRuntime {
 interface ReferenceSession {
 	sourceSheetKey: string;
 	targetSheetKey: string;
-	anchor: { row: number; col: number };
+	anchor: VisualCellAddress;
 	didDrag: boolean;
 }
 
@@ -81,8 +82,8 @@ export interface WorkbookCoordinatorInternals {
 	detachController(sheetKey: string, controller: SheetController): void;
 	attachDataGetter(sheetKey: string, getCells: () => CellValue[][]): void;
 	detachDataGetter(sheetKey: string, getCells: () => CellValue[][]): void;
-	handleCellPointerDown(sheetKey: string, address: { row: number; col: number }, event: MouseEvent): boolean;
-	handleCellPointerMove(sheetKey: string, address: { row: number; col: number }, event: MouseEvent): boolean;
+	handleCellPointerDown(sheetKey: string, address: VisualCellAddress, event: MouseEvent): boolean;
+	handleCellPointerMove(sheetKey: string, address: VisualCellAddress, event: MouseEvent): boolean;
 	handleEditModeChange(sheetKey: string, state: EditModeState | null): void;
 }
 
@@ -203,7 +204,7 @@ export function createWorkbookCoordinator(
 	let referenceSession: ReferenceSession | null = null;
 	let cleanupReferenceSession: (() => void) | null = null;
 
-	function tryEnsureSheetId(formulaName: string): ResultLike<number, WorkbookCoordinatorError> {
+	function tryEnsureSheetId(formulaName: string): ResultLike<FormulaSheetId, WorkbookCoordinatorError> {
 		const trace = withTraceContext({
 			module: "workbook-coordinator",
 			operation: "ensureSheetId",
@@ -227,7 +228,7 @@ export function createWorkbookCoordinator(
 		}
 		if (existingIdResult.value !== undefined) {
 			trace.ok({ sheetId: existingIdResult.value });
-			return Result.ok(existingIdResult.value);
+			return Result.ok(formulaSheetId(existingIdResult.value));
 		}
 
 		const addedNameResult = Result.try({
@@ -268,7 +269,7 @@ export function createWorkbookCoordinator(
 		}
 
 		trace.ok({ sheetId: addedIdResult.value });
-		return Result.ok(addedIdResult.value);
+		return Result.ok(formulaSheetId(addedIdResult.value));
 	}
 
 	function getSheetRuntime(sheetKey: string): WorkbookSheetRuntime {
@@ -301,7 +302,7 @@ export function createWorkbookCoordinator(
 		const snapshots: WorkbookStructuralChange["snapshots"] = [];
 		for (const runtime of sheets.values()) {
 			const serializedResult = Result.try({
-				try: () => hf.getSheetSerialized(runtime.sheetId),
+				try: () => hf.getSheetSerialized(toNumber(runtime.sheetId)),
 				catch: (cause) => new WorkbookSnapshotBuildError({
 					sheetKey: runtime.sheetKey,
 					sheetId: runtime.sheetId,
@@ -370,7 +371,7 @@ export function createWorkbookCoordinator(
 			const normalized = normalizeSheetContent(cells);
 			const setResult = Result.try({
 				try: () => {
-					hf.setSheetContent(runtime.sheetId, normalized);
+					hf.setSheetContent(toNumber(runtime.sheetId), normalized);
 				},
 				catch: (cause) => new WorkbookStructuralOperationError({
 					operation: "syncRegisteredSheetsToEngine",
@@ -584,7 +585,7 @@ export function createWorkbookCoordinator(
 			const runtime = runtimeResult.value;
 			const setResult = Result.try({
 				try: () => {
-					hf.setSheetContent(runtime.sheetId, normalizeSheetContent(snapshot.cells));
+					hf.setSheetContent(toNumber(runtime.sheetId), normalizeSheetContent(snapshot.cells));
 				},
 				catch: (cause) => new WorkbookSnapshotRestoreError({
 					sheetKey: snapshot.sheetKey,
@@ -611,7 +612,7 @@ export function createWorkbookCoordinator(
 		return Result.ok(change);
 	}
 
-	function tryInsertRows(sheetKey: string, atIndex: number, count: number): StructuralOpResult {
+	function tryInsertRows(sheetKey: string, atIndex: PhysicalRowIndex, count: number): StructuralOpResult {
 		const trace = withTraceContext({
 			module: "workbook-coordinator",
 			operation: "insertRows",
@@ -638,7 +639,7 @@ export function createWorkbookCoordinator(
 			return syncResult;
 		}
 		const canAddRowsResult = Result.try({
-			try: () => hf.isItPossibleToAddRows(runtime.sheetId, [atIndex, count]),
+			try: () => hf.isItPossibleToAddRows(toNumber(runtime.sheetId), [toNumber(atIndex), count]),
 			catch: (cause) => new WorkbookStructuralOperationError({
 				operation: "insertRows",
 				sheetKey,
@@ -662,12 +663,12 @@ export function createWorkbookCoordinator(
 		return tryApplyStructuralOperation(
 			{ type: "insertRows", sheetKey, atIndex, count },
 			() => {
-				hf.addRows(runtime.sheetId, [atIndex, count]);
+				hf.addRows(toNumber(runtime.sheetId), [toNumber(atIndex), count]);
 			},
 		);
 	}
 
-	function tryDeleteRows(sheetKey: string, atIndex: number, count: number): StructuralOpResult {
+	function tryDeleteRows(sheetKey: string, atIndex: PhysicalRowIndex, count: number): StructuralOpResult {
 		const trace = withTraceContext({
 			module: "workbook-coordinator",
 			operation: "deleteRows",
@@ -694,7 +695,7 @@ export function createWorkbookCoordinator(
 			return syncResult;
 		}
 		const canRemoveRowsResult = Result.try({
-			try: () => hf.isItPossibleToRemoveRows(runtime.sheetId, [atIndex, count]),
+			try: () => hf.isItPossibleToRemoveRows(toNumber(runtime.sheetId), [toNumber(atIndex), count]),
 			catch: (cause) => new WorkbookStructuralOperationError({
 				operation: "deleteRows",
 				sheetKey,
@@ -718,12 +719,12 @@ export function createWorkbookCoordinator(
 		return tryApplyStructuralOperation(
 			{ type: "deleteRows", sheetKey, atIndex, count },
 			() => {
-				hf.removeRows(runtime.sheetId, [atIndex, count]);
+				hf.removeRows(toNumber(runtime.sheetId), [toNumber(atIndex), count]);
 			},
 		);
 	}
 
-	function trySetRowOrder(sheetKey: string, indexOrder: number[]): StructuralOpResult {
+	function trySetRowOrder(sheetKey: string, indexOrder: PhysicalRowIndex[]): StructuralOpResult {
 		const trace = withTraceContext({
 			module: "workbook-coordinator",
 			operation: "setRowOrder",
@@ -745,7 +746,7 @@ export function createWorkbookCoordinator(
 			return syncResult;
 		}
 		const canSetRowOrderResult = Result.try({
-			try: () => hf.isItPossibleToSetRowOrder(runtime.sheetId, indexOrder),
+			try: () => hf.isItPossibleToSetRowOrder(toNumber(runtime.sheetId), indexOrder.map(toNumber)),
 			catch: (cause) => new WorkbookStructuralOperationError({
 				operation: "setRowOrder",
 				sheetKey,
@@ -756,6 +757,7 @@ export function createWorkbookCoordinator(
 				cause,
 			}),
 		});
+
 		if (Result.isError(canSetRowOrderResult)) {
 			trace.err(errorTraceContext(canSetRowOrderResult.error));
 			return canSetRowOrderResult;
@@ -768,7 +770,7 @@ export function createWorkbookCoordinator(
 		return tryApplyStructuralOperation(
 			{ type: "setRowOrder", sheetKey, indexOrder: [...indexOrder] },
 			() => {
-				hf.setRowOrder(runtime.sheetId, indexOrder);
+				hf.setRowOrder(toNumber(runtime.sheetId), indexOrder.map(toNumber));
 			},
 		);
 	}

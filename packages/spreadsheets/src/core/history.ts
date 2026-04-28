@@ -1,4 +1,6 @@
 import type { CellMutation, CellValue, RowReorderMutation, Selection } from "../types";
+import { type RowId } from "./brands";
+import { buildIndexOrder } from "./indexOrder";
 
 // ── Row Operation Types ─────────────────────────────────────────────────────
 
@@ -15,8 +17,8 @@ export type RowOperation =
 interface StoredRowReorder {
 	columnId: string;
 	direction: RowReorderMutation["direction"];
-	oldOrder: number[];
-	newOrder: number[];
+	oldOrder: RowId[];
+	newOrder: RowId[];
 }
 
 interface StoredColumnResize {
@@ -26,7 +28,7 @@ interface StoredColumnResize {
 }
 
 interface StoredRowResize {
-	rowId: number;
+	rowId: RowId;
 	oldHeight: number;
 	newHeight: number;
 }
@@ -98,8 +100,8 @@ export function pushMutationHistory(
 
 	const inverse = forward.map<CellMutation>((m) => ({
 		address: m.address,
-		viewAddress: m.viewAddress,
-		rowId: m.rowId,
+		...(m.viewAddress ? { viewAddress: m.viewAddress } : {}),
+		...(m.rowId !== undefined ? { rowId: m.rowId } : {}),
 		columnId: m.columnId,
 		oldValue: m.newValue,
 		newValue: m.oldValue,
@@ -197,16 +199,7 @@ export interface UndoResult {
 	rowChange?: UndoRedoRowChange;
 	rowReorder?: RowReorderMutation;
 	columnResize?: { columnId: string; width: number };
-	rowResize?: { rowId: number; height: number };
-}
-
-function buildIndexOrder(oldOrder: number[], newOrder: number[]): number[] {
-	const nextIndexByRowId = new Map<number, number>();
-	for (let i = 0; i < newOrder.length; i++) {
-		nextIndexByRowId.set(newOrder[i]!, i);
-	}
-
-	return oldOrder.map((rowId) => nextIndexByRowId.get(rowId) ?? -1);
+	rowResize?: { rowId: RowId; height: number };
 }
 
 function materializeRowReorder(

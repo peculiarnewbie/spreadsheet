@@ -22,6 +22,7 @@ export type {
 	EditModeState,
 	FormulaEngineConfig,
 	ParseValueContext,
+	PhysicalCellAddress,
 	RowReorderMutation,
 	ResizeMode,
 	ResizeSessionState,
@@ -34,6 +35,7 @@ export type {
 	SortBehavior,
 	SortDirection,
 	SortState,
+	VisualCellAddress,
 } from "./types";
 
 export type { RangeStyleRule, StyleTarget } from "./rangeStyles";
@@ -44,6 +46,23 @@ export type {
 	ResultLike,
 } from "./internal/result";
 export type { WorkbookCoordinatorError } from "./internal/errors";
+
+export type {
+	Brand,
+	ColumnIndex,
+	FormulaSheetId,
+	PhysicalRowIndex,
+	RowId,
+	VisualRowIndex,
+} from "./core/brands";
+export {
+	columnIdx,
+	formulaSheetId,
+	physicalRow,
+	rowId,
+	toNumber,
+	visualRow,
+} from "./core/brands";
 
 export type {
 	WorkbookCoordinator,

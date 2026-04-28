@@ -1,4 +1,5 @@
-import type { CellAddress, CellMutation, CellRange, CellValue, ColumnDef } from "../types";
+import type { CellMutation, CellRange, CellValue, ColumnDef, PhysicalCellAddress } from "../types";
+import { columnIdx, physicalRow, toNumber } from "./brands";
 import { normalizeRange } from "./selection";
 
 // ── TSV Serialization ────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export function parseTSV(text: string): CellValue[][] {
 
 export function buildPasteMutations(
 	parsed: CellValue[][],
-	target: CellAddress,
+	target: PhysicalCellAddress,
 	currentCells: CellValue[][],
 	columns: ColumnDef[],
 ): CellMutation[] {
@@ -43,15 +44,15 @@ export function buildPasteMutations(
 	for (let r = 0; r < parsed.length; r++) {
 		const pasteRow = parsed[r];
 		if (!pasteRow) continue;
-		const targetRow = target.row + r;
+		const targetRow = physicalRow(toNumber(target.row) + r);
 
 		for (let c = 0; c < pasteRow.length; c++) {
-			const targetCol = target.col + c;
-			const colDef = columns[targetCol];
+			const targetCol = columnIdx(toNumber(target.col) + c);
+			const colDef = columns[toNumber(targetCol)];
 			if (!colDef) continue;
 			if (colDef.editable === false) continue;
 
-			const oldValue = currentCells[targetRow]?.[targetCol] ?? null;
+			const oldValue = currentCells[toNumber(targetRow)]?.[toNumber(targetCol)] ?? null;
 			const newValue = pasteRow[c] ?? null;
 
 			mutations.push({

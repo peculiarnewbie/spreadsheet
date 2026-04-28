@@ -12,7 +12,8 @@ import {
 	dragFillHandle,
 	press,
 	focusGrid,
-	getPage,
+	withSheetCtrl,
+	withSheetCtrlMaybe,
 } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
@@ -44,18 +45,18 @@ describe("formula + row operations (E2E)", () => {
 		});
 
 		it("displays computed formula values on initial load", async () => {
-			const d0 = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(0, 3),
+			const d0 = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(0, 3),
 			);
 			expect(d0).toBe(100); // 48+52
 
-			const d2 = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(2, 3),
+			const d2 = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(2, 3),
 			);
 			expect(d2).toBe(59); // 28+31
 
-			const d3 = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(3, 3),
+			const d3 = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(3, 3),
 			);
 			expect(d3).toBe(226); // 100+67+59
 		});
@@ -70,9 +71,7 @@ describe("formula + row operations (E2E)", () => {
 
 		it("inserted row persists after committing a cell edit", async () => {
 			// Insert at index 2 (above Marketing)
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 			expect(await getRowCount(sh)).toBe(9); // was 8, now 9
 
 			// Row 2 is the new empty row
@@ -92,13 +91,9 @@ describe("formula + row operations (E2E)", () => {
 
 		it("double insert (above + below) persists after cell edit", async () => {
 			// Insert above row 1
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(1, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(1, 1));
 			// Insert below original row 1 (now at index 2)
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(3, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(3, 1));
 
 			expect(await getRowCount(sh)).toBe(10); // 8 + 2
 
@@ -121,9 +116,7 @@ describe("formula + row operations (E2E)", () => {
 
 		it("formula text is rewritten after row insert", async () => {
 			// Insert at index 2 (above Marketing)
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 			// Marketing's formula (was =B3+C3) should now be =B4+C4
 			const formula = await getCellValue(sh, 3, 3);
@@ -132,9 +125,7 @@ describe("formula + row operations (E2E)", () => {
 
 		it("SUM range expands when row is inserted within it", async () => {
 			// Insert at index 2 (within the D1:D3 range)
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 			// =SUM(D1:D3) should become =SUM(D1:D4)
 			const formula = await getCellValue(sh, 4, 3);
@@ -142,13 +133,11 @@ describe("formula + row operations (E2E)", () => {
 		});
 
 		it("formula display values are correct after insert (no stale HF cache)", async () => {
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 			// D4 (Marketing, was D3) should display 59, NOT 226 or any stale value
-			const d4 = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(3, 3),
+			const d4 = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(3, 3),
 			);
 			expect(d4).toBe(59);
 
@@ -159,17 +148,15 @@ describe("formula + row operations (E2E)", () => {
 
 		it("typing a formula after insert evaluates against the new layout", async () => {
 			// Insert at index 2
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 			// Type =C4 in a cell (C4 in post-insert layout = Marketing's Q2 = 31)
 			await doubleClickCell(sh, 2, 1);
 			await typeIntoCell(sh, "=C4");
 
 			// The display value should be 31 (Marketing's Q2), NOT "Sum"
-			const display = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(2, 1),
+			const display = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(2, 1),
 			);
 			expect(display).toBe(31);
 		});
@@ -186,9 +173,7 @@ describe("formula + row operations (E2E)", () => {
 			const origD2 = await getCellValue(sh, 2, 3);
 			const origD3 = await getCellValue(sh, 3, 3);
 
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 			expect(await getRowCount(sh)).toBe(9);
 
 			await focusGrid();
@@ -199,8 +184,8 @@ describe("formula + row operations (E2E)", () => {
 			expect(await getCellValue(sh, 3, 3)).toBe(origD3);
 
 			// Display values should be restored
-			const d2 = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(2, 3),
+			const d2 = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(2, 3),
 			);
 			expect(d2).toBe(59);
 		});
@@ -249,9 +234,7 @@ describe("formula + row operations (E2E)", () => {
 		});
 
 		it("insert row then autofill over the gap uses the post-insert layout", async () => {
-			await getPage().evaluate(() => {
-				(window as any).__SHEET_CONTROLLER__.insertRows(2, 1);
-			});
+			await withSheetCtrl((ctrl) => ctrl.insertRows(2, 1));
 
 			await clickCell(sh, 0, 3);
 			await shiftClickCell(sh, 1, 3);
@@ -260,8 +243,8 @@ describe("formula + row operations (E2E)", () => {
 			expect(await getCellValue(sh, 2, 3)).toBe("=B3+C3");
 			expect(await getCellValue(sh, 3, 3)).toBe("=B4+C4");
 
-			const display = await getPage().evaluate(
-				() => (window as any).__SHEET_CONTROLLER__?.getDisplayCellValue(3, 3),
+			const display = await withSheetCtrlMaybe(
+				(ctrl) => ctrl?.getDisplayCellValue(3, 3),
 			);
 			expect(display).toBe(59);
 		});

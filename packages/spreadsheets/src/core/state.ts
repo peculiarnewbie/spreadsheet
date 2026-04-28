@@ -8,6 +8,15 @@ import type {
 	RowReorderMutation,
 	Selection,
 } from "../types";
+import {
+	type PhysicalRowIndex,
+	type RowId,
+	columnIdx,
+	physicalRow,
+	rowId,
+	toNumber,
+	visualRow,
+} from "./brands";
 import { emptySelection, selectCell } from "./selection";
 import {
 	isFormulaValue,
@@ -34,7 +43,7 @@ import {
 
 export interface SheetState {
 	cells: CellValue[][];
-	rowIds: number[];
+	rowIds: RowId[];
 	rowCount: number;
 	colCount: number;
 }
@@ -44,7 +53,7 @@ export interface UndoRedoResult {
 	rowChange?: UndoRedoRowChange;
 	rowReorder?: RowReorderMutation;
 	columnResize?: { columnId: string; width: number };
-	rowResize?: { rowId: number; height: number };
+	rowResize?: { rowId: RowId; height: number };
 }
 
 export interface SheetStore {
@@ -52,28 +61,28 @@ export interface SheetStore {
 	cells: CellValue[][];
 	rowCount(): number;
 	colCount(): number;
-	rowIds(): number[];
+	rowIds(): RowId[];
 	dataRevision(): number;
 	selection(): Selection;
 	editMode(): EditModeState | null;
 	columnWidths(): Map<string, number>;
-	rowHeights(): Map<number, number>;
+	rowHeights(): Map<RowId, number>;
 	history(): HistoryStack;
 
 	// Mutations
-	setCell(row: number, col: number, value: CellValue): void;
-	setCells(mutations: Array<{ row: number; col: number; value: CellValue }>): void;
-	reorderRows(nextRowIds: number[]): void;
+	setCell(row: PhysicalRowIndex, col: number, value: CellValue): void;
+	setCells(mutations: Array<{ row: PhysicalRowIndex; col: number; value: CellValue }>): void;
+	reorderRows(nextRowIds: RowId[]): void;
 	setSelection(selection: Selection): void;
 	setEditMode(state: EditModeState | null): void;
 	setColumnWidth(columnId: string, width: number): void;
-	setRowHeight(rowId: number, height: number): void;
+	setRowHeight(rowId: RowId, height: number): void;
 	resizeGrid(rowCount: number, colCount: number): void;
-	restoreSnapshot(cells: CellValue[][], rowIds: number[]): void;
-	insertRows(atIndex: number, count: number): void;
-	deleteRows(atIndex: number, count: number): CellValue[][];
-	getRowIdAtPhysicalRow(row: number): number | null;
-	getPhysicalRowForRowId(rowId: number): number | null;
+	restoreSnapshot(cells: CellValue[][], rowIds: RowId[]): void;
+	insertRows(atIndex: PhysicalRowIndex, count: number): void;
+	deleteRows(atIndex: PhysicalRowIndex, count: number): CellValue[][];
+	getRowIdAtPhysicalRow(row: PhysicalRowIndex): RowId | null;
+	getPhysicalRowForRowId(rowId: RowId): PhysicalRowIndex | null;
 
 	// Row operation tracking (for reconciler guard)
 	hasPendingRowOp(): boolean;
@@ -93,7 +102,7 @@ export interface SheetStore {
 		selectionAfter: Selection,
 	): void;
 	pushRowResize(
-		rowResize: { rowId: number; oldHeight: number; newHeight: number },
+		rowResize: { rowId: RowId; oldHeight: number; newHeight: number },
 		selectionBefore: Selection,
 		selectionAfter: Selection,
 	): void;
@@ -117,18 +126,18 @@ export function createSheetStore(
 
 	const [cells, setCells] = createStore<CellValue[][]>(initialCells);
 	const [dimensions, setDimensions] = createSignal({ rowCount, colCount });
-	const [rowIds, setRowIds] = createSignal<number[]>(
-		Array.from({ length: rowCount }, (_, index) => index),
+	const [rowIds, setRowIds] = createSignal<RowId[]>(
+		Array.from({ length: rowCount }, (_, index) => rowId(index)),
 	);
 	const [nextRowId, setNextRowId] = createSignal(rowCount);
 	const [selection, setSelection] = createSignal<Selection>(
-		rowCount > 0 && colCount > 0 ? selectCell({ row: 0, col: 0 }) : emptySelection(),
+		rowCount > 0 && colCount > 0 ? selectCell({ row: visualRow(0), col: columnIdx(0) }) : emptySelection(),
 	);
 	const [editMode, setEditMode] = createSignal<EditModeState | null>(null);
 	const [colWidths, setColWidths] = createSignal<Map<string, number>>(
 		new Map(columns.map((c) => [c.id, c.width ?? 120])),
 	);
-	const [rowHeights, setRowHeights] = createSignal<Map<number, number>>(new Map());
+	const [rowHeights, setRowHeights] = createSignal<Map<RowId, number>>(new Map());
 	const [historyState, setHistory] = createSignal<HistoryStack>(createHistory());
 	const [hasPendingRowOp, setHasPendingRowOp] = createSignal(false);
 	const [dataRevision, setDataRevision] = createSignal(0);
@@ -143,7 +152,7 @@ export function createSheetStore(
 		const cc = dimensions().colCount;
 		const insertAt = Math.max(0, Math.min(atIndex, currentRowCount));
 		const startId = nextRowId();
-		const newRowIds = Array.from({ length: count }, (_, index) => startId + index);
+		const newRowIds = Array.from({ length: count }, (_, index) => rowId(startId + index));
 		setNextRowId((value) => value + count);
 
 		setDimensions({ rowCount: currentRowCount + count, colCount: cc });
@@ -259,25 +268,25 @@ export function createSheetStore(
 		}
 	}
 
-	function getPhysicalRowForRowId(rowId: number): number | null {
-		const index = rowIds().indexOf(rowId);
-		return index >= 0 ? index : null;
+	function getPhysicalRowForRowId(id: RowId): PhysicalRowIndex | null {
+		const index = rowIds().indexOf(id);
+		return index >= 0 ? physicalRow(index) : null;
 	}
 
-	function reorderRows(nextOrder: number[]) {
+	function reorderRows(nextOrder: RowId[]) {
 		const currentRowIds = rowIds();
 		if (nextOrder.length !== currentRowIds.length) return;
 
-		const currentIndexByRowId = new Map<number, number>();
-		for (let i = 0; i < currentRowIds.length; i++) {
-			currentIndexByRowId.set(currentRowIds[i]!, i);
+		const currentIndexByRowId = new Map<RowId, PhysicalRowIndex>();
+		for (const [i, id] of currentRowIds.entries()) {
+			currentIndexByRowId.set(id, physicalRow(i));
 		}
 
-		if (nextOrder.some((rowId) => !currentIndexByRowId.has(rowId))) return;
+		if (nextOrder.some((id) => !currentIndexByRowId.has(id))) return;
 
-		const nextCells = nextOrder.map((rowId) => {
-			const currentIndex = currentIndexByRowId.get(rowId)!;
-			const row = cells[currentIndex];
+		const nextCells = nextOrder.map((id) => {
+			const currentIndex = currentIndexByRowId.get(id)!;
+			const row = cells[toNumber(currentIndex)];
 			return row ? [...row] : new Array(dimensions().colCount).fill(null) as CellValue[];
 		});
 
@@ -307,7 +316,7 @@ export function createSheetStore(
 		rowHeights,
 		history: historyState,
 
-		setCell(row: number, col: number, value: CellValue) {
+		setCell(row: PhysicalRowIndex, col: number, value: CellValue) {
 			setCells(
 				produce((draft) => {
 					// Ensure row exists
@@ -325,7 +334,7 @@ export function createSheetStore(
 			bumpDataRevision();
 		},
 
-		setCells(mutations: Array<{ row: number; col: number; value: CellValue }>) {
+		setCells(mutations: Array<{ row: PhysicalRowIndex; col: number; value: CellValue }>) {
 			if (mutations.length === 0) return;
 			setCells(
 				produce((draft) => {
@@ -357,10 +366,10 @@ export function createSheetStore(
 			});
 		},
 
-		setRowHeight(rowId: number, height: number) {
+		setRowHeight(id: RowId, height: number) {
 			setRowHeights((prev) => {
 				const next = new Map(prev);
-				next.set(rowId, height);
+				next.set(id, height);
 				return next;
 			});
 		},
@@ -397,7 +406,7 @@ export function createSheetStore(
 				const additional = newRowCount - prev.length;
 				const startId = nextRowId();
 				for (let i = 0; i < additional; i++) {
-					next.push(startId + i);
+					next.push(rowId(startId + i));
 				}
 				setNextRowId(startId + additional);
 				return next;
@@ -405,7 +414,7 @@ export function createSheetStore(
 			bumpDataRevision();
 		},
 
-		restoreSnapshot(nextCells: CellValue[][], nextRowIds: number[]) {
+		restoreSnapshot(nextCells: CellValue[][], nextRowIds: RowId[]) {
 			setDimensions({ rowCount: nextCells.length, colCount: dimensions().colCount });
 			setCells(
 				produce((draft) => {
@@ -420,16 +429,16 @@ export function createSheetStore(
 			bumpDataRevision();
 		},
 
-		insertRows(atIndex: number, count: number) {
-			_insertRows(atIndex, count);
+		insertRows(atIndex: PhysicalRowIndex, count: number) {
+			_insertRows(toNumber(atIndex), count);
 		},
 
-		deleteRows(atIndex: number, count: number): CellValue[][] {
-			return _deleteRows(atIndex, count);
+		deleteRows(atIndex: PhysicalRowIndex, count: number): CellValue[][] {
+			return _deleteRows(toNumber(atIndex), count);
 		},
 
-		getRowIdAtPhysicalRow(row: number): number | null {
-			return rowIds()[row] ?? null;
+		getRowIdAtPhysicalRow(row: PhysicalRowIndex): RowId | null {
+			return rowIds()[toNumber(row)] ?? null;
 		},
 
 		getPhysicalRowForRowId,
@@ -462,7 +471,7 @@ export function createSheetStore(
 		},
 
 		pushRowResize(
-			rowResize: { rowId: number; oldHeight: number; newHeight: number },
+			rowResize: { rowId: RowId; oldHeight: number; newHeight: number },
 			selectionBefore: Selection,
 			selectionAfter: Selection,
 		) {
@@ -533,10 +542,10 @@ export function createSheetStore(
 
 			return {
 				mutations: result.mutations,
-				rowChange: result.rowChange,
-				rowReorder: result.rowReorder,
-				columnResize: result.columnResize,
-				rowResize: result.rowResize,
+				...(result.rowChange !== undefined ? { rowChange: result.rowChange } : {}),
+				...(result.rowReorder ? { rowReorder: result.rowReorder } : {}),
+				...(result.columnResize ? { columnResize: result.columnResize } : {}),
+				...(result.rowResize ? { rowResize: result.rowResize } : {}),
 			};
 		},
 
@@ -588,10 +597,10 @@ export function createSheetStore(
 
 			return {
 				mutations: result.mutations,
-				rowChange: result.rowChange,
-				rowReorder: result.rowReorder,
-				columnResize: result.columnResize,
-				rowResize: result.rowResize,
+				...(result.rowChange !== undefined ? { rowChange: result.rowChange } : {}),
+				...(result.rowReorder ? { rowReorder: result.rowReorder } : {}),
+				...(result.columnResize ? { columnResize: result.columnResize } : {}),
+				...(result.rowResize ? { rowResize: result.rowResize } : {}),
 			};
 		},
 
@@ -654,7 +663,7 @@ export function createReconciler(
 				}
 
 				// Reconcile cell data — host values overwrite internal state
-				const mutations: Array<{ row: number; col: number; value: CellValue }> = [];
+				const mutations: Array<{ row: PhysicalRowIndex; col: number; value: CellValue }> = [];
 				for (let r = 0; r < data.length; r++) {
 					const dataRow = data[r];
 					if (!dataRow) continue;
@@ -666,7 +675,7 @@ export function createReconciler(
 						const externalValue = (c < dataRow.length ? dataRow[c] : null) ?? null;
 						const internalValue = store.cells[r]?.[c] ?? null;
 						if (externalValue !== internalValue) {
-							mutations.push({ row: r, col: c, value: externalValue });
+							mutations.push({ row: physicalRow(r), col: c, value: externalValue });
 						}
 					}
 				}
