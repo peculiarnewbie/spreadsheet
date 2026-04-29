@@ -1,12 +1,15 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	doubleClickCell,
 	focusGrid,
 	getCellText,
 	getCellValue,
 	getRowCount,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	press,
 	typeIntoCell,
 	withSheetCtrl,
@@ -19,10 +22,16 @@ describe("formula + row delete (E2E)", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
 	});
 
 	beforeEach(async () => {
 		await navigateTo(sh, "/formula-row-delete");
+	});
+
+	afterAll(async () => {
+		await logMemory("formula-row-delete");
+		await closePage();
 	});
 
 	it("rewrites neighboring raw formulas when a referenced row is deleted", async () => {

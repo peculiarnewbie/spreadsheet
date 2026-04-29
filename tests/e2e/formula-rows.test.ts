@@ -1,7 +1,10 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	getCellText,
 	getRowCount,
@@ -35,6 +38,12 @@ describe("formula + row operations (E2E)", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
+	});
+
+	afterAll(async () => {
+		await logMemory("formula-rows");
+		await closePage();
 	});
 
 	// ── Baseline ────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ interface E2EPage {
 	keyPress(key: string): Promise<void>;
 	sendCDP(method: "Input.dispatchMouseEvent", params: Record<string, unknown>): Promise<void>;
 	dragAndDrop(startX: number, startY: number, targetX: number, targetY: number, options?: { steps?: number }): Promise<void>;
+	close(): Promise<void>;
 }
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3141";
@@ -32,17 +33,15 @@ let _initPromise: Promise<Stagehand> | null = null;
 export async function getStagehand(): Promise<Stagehand> {
 	if (!_initPromise) {
 		_initPromise = (async () => {
-			const headless = process.env.E2E_HEADLESS !== "false";
-		_stagehand = new Stagehand({
-			env: "LOCAL",
-			localBrowserLaunchOptions: {
-				headless,
-				args: headless ? ["--disable-gpu"] : ["--disable-gpu", "--disable-gpu-sandbox"],
-			},
-		});
+			const headless = process.env.E2E_HEADLESS === "true";
+			_stagehand = new Stagehand({
+				env: "LOCAL",
+				localBrowserLaunchOptions: {
+					headless,
+					args: headless ? ["--disable-gpu"] : ["--disable-gpu", "--disable-gpu-sandbox"],
+				},
+			});
 			await _stagehand.init();
-			_page = _stagehand.context.activePage() as E2EPage | null;
-			if (!_page) throw new Error("No active page after Stagehand init");
 
 			// Close once when the process exits — no per-file teardown needed
 			process.on("beforeExit", () => closeStagehand());
@@ -52,13 +51,28 @@ export async function getStagehand(): Promise<Stagehand> {
 	return _initPromise;
 }
 
+/** Open a fresh page in the shared Stagehand context. */
+export async function newPage(): Promise<E2EPage> {
+	const sh = await getStagehand();
+	_page = await sh.context.newPage() as E2EPage;
+	return _page;
+}
+
 /**
  * Get the active Stagehand v3 Page.
- * Must call getStagehand() first (e.g. in beforeAll).
+ * Must call newPage() first (e.g. in beforeAll).
  */
 export function getPage(): E2EPage {
-	if (!_page) throw new Error("Page not initialized — call getStagehand() first");
+	if (!_page) throw new Error("Page not initialized — call newPage() first");
 	return _page;
+}
+
+/** Close the current page (keeps the browser alive). */
+export async function closePage(): Promise<void> {
+	if (_page) {
+		await _page.close();
+		_page = null;
+	}
 }
 
 /** Tear down the shared Stagehand instance. */
@@ -67,6 +81,7 @@ export async function closeStagehand(): Promise<void> {
 		await _stagehand.close();
 		_stagehand = null;
 		_page = null;
+		_initPromise = null;
 	}
 }
 
@@ -174,6 +189,19 @@ export async function clearMutations(_sh: Stagehand): Promise<void> {
 			window.__ROW_REORDERS__ = [];
 		}
 	});
+}
+
+/** Log current JS heap usage (MB) to stderr for debugging memory pressure. */
+export async function logMemory(label?: string): Promise<void> {
+	const page = getPage();
+	const mem = await page.evaluate(() => {
+		const m = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+		return m ? m.usedJSHeapSize : null;
+	});
+	if (mem !== null) {
+		const tag = label ? ` [${label}]` : "";
+		process.stderr.write(`[memory]${tag} ${Math.round(mem / 1e6)}MB\n`);
+	}
 }
 
 // ── Interaction helpers ───────────────────────────────────────────────────

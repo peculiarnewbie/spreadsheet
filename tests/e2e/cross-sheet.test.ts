@@ -1,5 +1,5 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { clickContextMenuItem, getPage, getStagehand, getWorkbookData, navigateTo, withWorkbookCtrl } from "./setup";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { clickContextMenuItem, closePage, getPage, getStagehand, logMemory, navigateTo, newPage, getWorkbookData, withWorkbookCtrl } from "./setup";
 import type { Stagehand } from "@browserbasehq/stagehand";
 
 function sheetCellLocator(sheetTestId: string, row: number, col: number) {
@@ -102,10 +102,16 @@ describe("cross-sheet workbook mode", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
 	});
 
 	beforeEach(async () => {
 		await navigateTo(sh, "/cross-sheet");
+	});
+
+	afterAll(async () => {
+		await logMemory("cross-sheet");
+		await closePage();
 	});
 
 	it("evaluates cross-sheet formulas on initial load", async () => {

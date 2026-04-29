@@ -1,7 +1,10 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	clearMutations,
 	clickCell,
@@ -17,7 +20,13 @@ describe("history", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
 		await navigateTo(sh, "/history");
+	});
+
+	afterAll(async () => {
+		await logMemory("history");
+		await closePage();
 	});
 
 	beforeEach(async () => {

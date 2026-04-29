@@ -1,9 +1,10 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { Stagehand } from "@browserbasehq/stagehand";
 import {
 	clickCell,
 	clickColumnHeader,
 	clickContextMenuItem,
+	closePage,
 	doubleClickCell,
 	focusGrid,
 	getCellText,
@@ -14,7 +15,9 @@ import {
 	getRowCount,
 	getSheetData,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	press,
 	rightClickColumnHeader,
 	typeIntoCell,
@@ -25,6 +28,12 @@ describe("sorting", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
+	});
+
+	afterAll(async () => {
+		await logMemory("sort");
+		await closePage();
 	});
 
 	it("keeps external sorting as UI state and fires sort intent including clear", async () => {

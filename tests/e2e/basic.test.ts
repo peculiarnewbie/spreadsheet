@@ -10,19 +10,24 @@
  * of truth for CI + the marketing demo.
  */
 
-import { beforeAll, describe, it } from "bun:test";
+import { afterAll, beforeAll, describe, it } from "bun:test";
 import type { Stagehand } from "@browserbasehq/stagehand";
 import { runScenario } from "sheet-scenarios";
 import { basicScenarios } from "sheet-scenarios/scenarios";
 import { StagehandDriver } from "sheet-scenarios/stagehand";
-import { getStagehand } from "./setup";
+import { closePage, getStagehand, newPage } from "./setup";
 
 describe("basic", () => {
 	let driver: StagehandDriver;
 
 	beforeAll(async () => {
 		const sh: Stagehand = await getStagehand();
+		await newPage();
 		driver = new StagehandDriver(sh);
+	});
+
+	afterAll(async () => {
+		await closePage();
 	});
 
 	for (const scenario of basicScenarios) {

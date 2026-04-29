@@ -16,10 +16,13 @@
  * a real DOM + the Solid reactive scheduler. The headless pieces are covered
  * in `packages/spreadsheets/src/core/column-hooks.test.ts`.
  */
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	getCellText,
 	getMutations,
@@ -35,12 +38,16 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 describe("custom rendering hooks", () => {
 	let sh: Stagehand;
 
-	async function getEditorValue(): Promise<string | null> {
-		return getPage().evaluate(() => {
-			const input = document.querySelector(".se-cell-editor");
-			if (!(input instanceof HTMLInputElement)) return null;
-			return input.value;
-		});
+	beforeAll(async () => {
+		sh = await getStagehand();
+		await newPage();
+		await navigateTo(sh, "/custom-rendering");
+	});
+
+	afterAll(async () => {
+		await logMemory("custom-rendering");
+		await closePage();
+	});
 	}
 
 	async function getCellTitle(row: number, col: number): Promise<string | null> {

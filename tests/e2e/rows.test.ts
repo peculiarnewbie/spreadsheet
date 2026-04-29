@@ -1,7 +1,10 @@
-import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	getRowCount,
 	press,
@@ -23,11 +26,17 @@ describe("row operations", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
 	});
 
 	// Navigate fresh before each test to get a clean 3-row dataset
 	beforeEach(async () => {
 		await navigateTo(sh, "/rows");
+	});
+
+	afterAll(async () => {
+		await logMemory("rows");
+		await closePage();
 	});
 
 	// ── Insert Rows ─────────────────────────────────────────────────

@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	getMutations,
 	clearMutations,
@@ -34,6 +37,12 @@ describe("autofill", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
+	});
+
+	afterAll(async () => {
+		await logMemory("autofill");
+		await closePage();
 	});
 
 	describe("linear series", () => {

@@ -1,7 +1,10 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
+	closePage,
 	getStagehand,
+	logMemory,
 	navigateTo,
+	newPage,
 	getCellValue,
 	doubleClickCell,
 	typeIntoCell,
@@ -55,7 +58,13 @@ describe("large dataset", () => {
 
 	beforeAll(async () => {
 		sh = await getStagehand();
+		await newPage();
 		await navigateTo(sh, "/large");
+	});
+
+	afterAll(async () => {
+		await logMemory("large");
+		await closePage();
 	});
 
 	it("renders without crashing", async () => {
