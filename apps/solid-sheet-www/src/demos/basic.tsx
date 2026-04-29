@@ -31,11 +31,7 @@ export default function BasicSheet(props: BasicSheetProps = {}) {
         <Sheet
           data={liveData()}
           columns={columns}
-          onCellEdit={bindings.onCellEdit}
-          onBatchEdit={bindings.onBatchEdit}
-          onRowInsert={bindings.onRowInsert}
-          onRowDelete={bindings.onRowDelete}
-          onRowReorder={bindings.onRowReorder}
+          onOperation={bindings.onOperation}
           ref={ref}
         />
       )}

@@ -67,8 +67,7 @@ interface GridProps {
 	showFormulaBar: boolean;
 	showReferenceHeaders: boolean;
 	onSelectionChange?: SheetProps["onSelectionChange"] | undefined;
-	onCellEdit?: SheetProps["onCellEdit"] | undefined;
-	onBatchEdit?: SheetProps["onBatchEdit"] | undefined;
+	onOperation?: SheetProps["onOperation"] | undefined;
 	onEditModeChange?: SheetProps["onEditModeChange"] | undefined;
 	onClipboard?: SheetProps["onClipboard"] | undefined;
 	resizeMode: ResizeMode;
@@ -80,9 +79,6 @@ interface GridProps {
 	onRowResize?: SheetProps["onRowResize"] | undefined;
 	onSort?: SheetProps["onSort"] | undefined;
 	onSortChange?: SheetProps["onSortChange"] | undefined;
-	onRowInsert?: SheetProps["onRowInsert"] | undefined;
-	onRowDelete?: SheetProps["onRowDelete"] | undefined;
-	onRowReorder?: SheetProps["onRowReorder"] | undefined;
 	onCellPointerDown?: SheetProps["onCellPointerDown"] | undefined;
 	onCellPointerMove?: SheetProps["onCellPointerMove"] | undefined;
 	controllerRef?: SheetProps["ref"] | undefined;
@@ -965,7 +961,7 @@ export default function Grid(props: GridProps) {
 		if (mutations.length === 0) return;
 		if (!syncMutationsToFormulaEngine(mutations)) return;
 		applyMutations(props.store, mutations);
-		props.onBatchEdit?.(mutations);
+		props.onOperation?.({ type: "batch-edit", mutations });
 	}
 
 	function setEditorSelection(start: number, end: number = start) {
@@ -1104,7 +1100,7 @@ export default function Grid(props: GridProps) {
 
 		if (mutation) {
 			applyMutations(props.store, [mutation]);
-			props.onCellEdit?.(mutation);
+			props.onOperation?.({ type: "cell-edit", mutation });
 		}
 
 		focusGrid();
@@ -1600,7 +1596,7 @@ export default function Grid(props: GridProps) {
 			if (!coordinator) return;
 			const change = coordinator.insertRows(sheetKey, physicalRow(atIndex), count);
 			if (didApplyResult(change)) {
-				props.onRowInsert?.(atIndex, count);
+				props.onOperation?.({ type: "row-insert", atIndex, count });
 			}
 			focusGrid();
 			return;
@@ -1618,7 +1614,7 @@ export default function Grid(props: GridProps) {
 			selBefore,
 			props.store.selection(),
 		);
-		props.onRowInsert?.(atIndex, count);
+		props.onOperation?.({ type: "row-insert", atIndex, count });
 		focusGrid();
 	}
 
@@ -1633,7 +1629,7 @@ export default function Grid(props: GridProps) {
 			if (!coordinator) return;
 			const change = coordinator.deleteRows(sheetKey, physicalAtIndex, count);
 			if (didApplyResult(change)) {
-				props.onRowDelete?.(physicalAtIndex, count);
+				props.onOperation?.({ type: "row-delete", atIndex: physicalAtIndex, count });
 			}
 			focusGrid();
 			return;
@@ -1661,7 +1657,7 @@ export default function Grid(props: GridProps) {
 			selBefore,
 			props.store.selection(),
 		);
-		props.onRowDelete?.(physicalAtIndex, count);
+		props.onOperation?.({ type: "row-delete", atIndex: physicalAtIndex, count });
 		focusGrid();
 	}
 
@@ -1787,7 +1783,7 @@ export default function Grid(props: GridProps) {
 			if (!coordinator) return;
 			const change = coordinator.setRowOrder(sheetKey, reorderEvent.indexOrder);
 			if (!didApplyResult(change)) return;
-			props.onRowReorder?.(reorderEvent);
+			props.onOperation?.({ type: "row-reorder", mutation: reorderEvent });
 			return;
 		}
 
@@ -1818,7 +1814,7 @@ export default function Grid(props: GridProps) {
 			selectionBefore,
 			props.store.selection(),
 		);
-		props.onRowReorder?.(reorderEvent);
+		props.onOperation?.({ type: "row-reorder", mutation: reorderEvent });
 	}
 
 	function applyMutationSort(sort: SortState | null, options?: { baseOrder?: RowId[] | null }) {
@@ -2013,19 +2009,19 @@ export default function Grid(props: GridProps) {
 				if (undoResult) {
 					if (undoResult.mutations.length > 0) {
 						if (!syncAlreadyAppliedMutationsToFormulaEngine(undoResult.mutations)) break;
-						props.onBatchEdit?.(undoResult.mutations);
+						props.onOperation?.({ type: "batch-edit", mutations: undoResult.mutations });
 					}
 					if (undoResult.rowChange) {
 						if (!syncAllToFormulaEngine()) break;
 						if (undoResult.rowChange.type === "insertRows") {
-							props.onRowInsert?.(undoResult.rowChange.atIndex, undoResult.rowChange.count);
+							props.onOperation?.({ type: "row-insert", atIndex: undoResult.rowChange.atIndex, count: undoResult.rowChange.count });
 						} else {
-							props.onRowDelete?.(undoResult.rowChange.atIndex, undoResult.rowChange.count);
+							props.onOperation?.({ type: "row-delete", atIndex: undoResult.rowChange.atIndex, count: undoResult.rowChange.count });
 						}
 					}
 					if (undoResult.rowReorder) {
 						if (!syncRowOrderToFormulaEngine(undoResult.rowReorder.indexOrder)) break;
-						props.onRowReorder?.(undoResult.rowReorder);
+						props.onOperation?.({ type: "row-reorder", mutation: undoResult.rowReorder });
 					}
 					if (undoResult.columnResize && props.columnSizing === undefined) {
 						notifyColumnResizeState(undoResult.columnResize.columnId, undoResult.columnResize.width);
@@ -2046,19 +2042,19 @@ export default function Grid(props: GridProps) {
 				if (redoResult) {
 					if (redoResult.mutations.length > 0) {
 						if (!syncAlreadyAppliedMutationsToFormulaEngine(redoResult.mutations)) break;
-						props.onBatchEdit?.(redoResult.mutations);
+						props.onOperation?.({ type: "batch-edit", mutations: redoResult.mutations });
 					}
 					if (redoResult.rowChange) {
 						if (!syncAllToFormulaEngine()) break;
 						if (redoResult.rowChange.type === "insertRows") {
-							props.onRowInsert?.(redoResult.rowChange.atIndex, redoResult.rowChange.count);
+							props.onOperation?.({ type: "row-insert", atIndex: redoResult.rowChange.atIndex, count: redoResult.rowChange.count });
 						} else {
-							props.onRowDelete?.(redoResult.rowChange.atIndex, redoResult.rowChange.count);
+							props.onOperation?.({ type: "row-delete", atIndex: redoResult.rowChange.atIndex, count: redoResult.rowChange.count });
 						}
 					}
 					if (redoResult.rowReorder) {
 						if (!syncRowOrderToFormulaEngine(redoResult.rowReorder.indexOrder)) break;
-						props.onRowReorder?.(redoResult.rowReorder);
+						props.onOperation?.({ type: "row-reorder", mutation: redoResult.rowReorder });
 					}
 					if (redoResult.columnResize && props.columnSizing === undefined) {
 						notifyColumnResizeState(redoResult.columnResize.columnId, redoResult.columnResize.width);
@@ -2379,7 +2375,7 @@ export default function Grid(props: GridProps) {
 						if (!mutation) return;
 						if (!syncMutationToFormulaEngine(mutation)) return;
 						applyMutations(props.store, [mutation]);
-						props.onCellEdit?.(mutation);
+						props.onOperation?.({ type: "cell-edit", mutation });
 				},
 				getColumnMeta: (columnId) =>
 					props.columns.find((column) => column.id === columnId)?.meta,
@@ -2392,19 +2388,19 @@ export default function Grid(props: GridProps) {
 					if (result) {
 						if (result.mutations.length > 0) {
 							if (!syncAlreadyAppliedMutationsToFormulaEngine(result.mutations)) return;
-							props.onBatchEdit?.(result.mutations);
+							props.onOperation?.({ type: "batch-edit", mutations: result.mutations });
 						}
 							if (result.rowChange) {
 								if (!syncAllToFormulaEngine()) return;
 								if (result.rowChange.type === "insertRows") {
-									props.onRowInsert?.(result.rowChange.atIndex, result.rowChange.count);
+									props.onOperation?.({ type: "row-insert", atIndex: result.rowChange.atIndex, count: result.rowChange.count });
 								} else {
-									props.onRowDelete?.(result.rowChange.atIndex, result.rowChange.count);
+									props.onOperation?.({ type: "row-delete", atIndex: result.rowChange.atIndex, count: result.rowChange.count });
 								}
 							}
 							if (result.rowReorder) {
 								if (!syncRowOrderToFormulaEngine(result.rowReorder.indexOrder)) return;
-								props.onRowReorder?.(result.rowReorder);
+								props.onOperation?.({ type: "row-reorder", mutation: result.rowReorder });
 							}
 							if (result.columnResize && props.columnSizing === undefined) {
 								notifyColumnResizeState(result.columnResize.columnId, result.columnResize.width);
@@ -2423,19 +2419,19 @@ export default function Grid(props: GridProps) {
 					if (result) {
 						if (result.mutations.length > 0) {
 							if (!syncAlreadyAppliedMutationsToFormulaEngine(result.mutations)) return;
-							props.onBatchEdit?.(result.mutations);
+							props.onOperation?.({ type: "batch-edit", mutations: result.mutations });
 						}
 							if (result.rowChange) {
 								if (!syncAllToFormulaEngine()) return;
 								if (result.rowChange.type === "insertRows") {
-									props.onRowInsert?.(result.rowChange.atIndex, result.rowChange.count);
+									props.onOperation?.({ type: "row-insert", atIndex: result.rowChange.atIndex, count: result.rowChange.count });
 								} else {
-									props.onRowDelete?.(result.rowChange.atIndex, result.rowChange.count);
+									props.onOperation?.({ type: "row-delete", atIndex: result.rowChange.atIndex, count: result.rowChange.count });
 								}
 							}
 							if (result.rowReorder) {
 								if (!syncRowOrderToFormulaEngine(result.rowReorder.indexOrder)) return;
-								props.onRowReorder?.(result.rowReorder);
+								props.onOperation?.({ type: "row-reorder", mutation: result.rowReorder });
 							}
 							if (result.columnResize && props.columnSizing === undefined) {
 								notifyColumnResizeState(result.columnResize.columnId, result.columnResize.width);

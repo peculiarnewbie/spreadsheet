@@ -164,6 +164,13 @@ export interface ColumnDef {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
+export type SheetOperation =
+	| { type: "cell-edit"; mutation: CellMutation }
+	| { type: "batch-edit"; mutations: CellMutation[] }
+	| { type: "row-insert"; atIndex: number; count: number }
+	| { type: "row-delete"; atIndex: number; count: number }
+	| { type: "row-reorder"; mutation: RowReorderMutation };
+
 export interface CellMutation {
 	address: PhysicalCellAddress;
 	viewAddress?: VisualCellAddress;
@@ -320,8 +327,7 @@ export interface SheetProps {
 
 	// Event callbacks
 	onSelectionChange?: (selection: Selection) => void;
-	onCellEdit?: (mutation: CellMutation) => void;
-	onBatchEdit?: (mutations: CellMutation[]) => void;
+	onOperation?: (operation: SheetOperation) => void | Promise<void>;
 	onEditModeChange?: (state: EditModeState | null) => void;
 	onClipboard?: (payload: ClipboardPayload) => void;
 	onScroll?: (position: ScrollPosition) => void;
@@ -333,11 +339,7 @@ export interface SheetProps {
 	onRowResize?: (rowId: RowId, height: number) => void;
 	onSort?: (columnId: string, direction: SortDirection | null) => void;
 	onSortChange?: (state: SortState | null) => void;
-	/** Called when rows are inserted. The host should update its data array accordingly. */
-	onRowInsert?: (atIndex: number, count: number) => void;
-	/** Called when rows are deleted. The host should update its data array accordingly. */
-	onRowDelete?: (atIndex: number, count: number) => void;
-	onRowReorder?: (mutation: RowReorderMutation) => void;
+
 
 	sortBehavior?: SortBehavior;
 	sortState?: SortState | null;

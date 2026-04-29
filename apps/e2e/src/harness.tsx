@@ -89,11 +89,7 @@ export default function Harness(props: HarnessProps) {
 				showFormulaBar={props.showFormulaBar}
 				showReferenceHeaders={props.showReferenceHeaders}
 				customization={props.customization}
-				onCellEdit={bindings.onCellEdit}
-				onBatchEdit={bindings.onBatchEdit}
-				onRowInsert={bindings.onRowInsert}
-				onRowDelete={bindings.onRowDelete}
-				onRowReorder={bindings.onRowReorder}
+				onOperation={bindings.onOperation}
 				onSort={props.onSort}
 				onSortChange={setSortState}
 				ref={handleRef}

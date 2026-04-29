@@ -1,8 +1,22 @@
 export { Sheet } from "./Sheet";
 export { createWorkbookCoordinator } from "./workbook/coordinator";
-export { addressToA1, isFormulaValue, rangeToA1, shiftFormulaByDelta } from "./formula/references";
+export {
+	addressToA1,
+	columnIndexToLetters,
+	isFormulaValue,
+	lettersToColumnIndex,
+	parseA1Address,
+	rangeToA1,
+	shiftFormulaByDelta,
+} from "./formula/references";
 export { createRangeStyles } from "./rangeStyles";
 export { Result, isApplied, isNoop } from "./internal/result";
+export {
+	isCellValue,
+	isCellMatrix,
+	normalizeCellValue,
+	normalizeCellMatrix,
+} from "./core/validators";
 export {
 	DEFAULT_COL_WIDTH,
 	DEFAULT_ROW_HEIGHT,
@@ -30,6 +44,7 @@ export type {
 	Selection,
 	SheetController,
 	SheetCustomization,
+	SheetOperation,
 	SheetSizingState,
 	SheetProps,
 	SortBehavior,
@@ -46,6 +61,22 @@ export type {
 	ResultLike,
 } from "./internal/result";
 export type { WorkbookCoordinatorError } from "./internal/errors";
+export {
+	FormulaSheetResolutionError,
+	FormulaEngineSubscriptionError,
+	FormulaEngineSyncError,
+	FormulaCellUpdateError,
+	FormulaDisplayValueError,
+	FormulaRowOrderError,
+	WorkbookSheetNotRegisteredError,
+	WorkbookBindingMismatchError,
+	WorkbookDuplicateFormulaNameError,
+	WorkbookSnapshotBuildError,
+	WorkbookSnapshotRestoreError,
+	WorkbookReferenceInsertError,
+	WorkbookStructuralOperationError,
+	WorkbookHistoryError,
+} from "./internal/errors";
 
 export type {
 	Brand,

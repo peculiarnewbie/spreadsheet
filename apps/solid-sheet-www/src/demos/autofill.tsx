@@ -37,11 +37,7 @@ export default function AutofillSheet(props: AutofillSheetProps = {}) {
         <Sheet
           data={liveData()}
           columns={columns}
-          onCellEdit={bindings.onCellEdit}
-          onBatchEdit={bindings.onBatchEdit}
-          onRowInsert={bindings.onRowInsert}
-          onRowDelete={bindings.onRowDelete}
-          onRowReorder={bindings.onRowReorder}
+          onOperation={bindings.onOperation}
           ref={ref}
         />
       )}

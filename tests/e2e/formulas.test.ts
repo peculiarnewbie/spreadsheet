@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import {
 	getStagehand,
+	getPage,
 	navigateTo,
 	getCellValue,
 	clearMutations,

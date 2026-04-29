@@ -98,8 +98,7 @@ export function Sheet(props: SheetProps) {
 				rowHeight={rowHeight()}
 				readOnly={readOnly()}
 				onSelectionChange={props.onSelectionChange}
-				onCellEdit={props.onCellEdit}
-				onBatchEdit={props.onBatchEdit}
+					onOperation={props.onOperation}
 				onEditModeChange={(state) => {
 					if (props.workbook) {
 						requireWorkbookInternals().handleEditModeChange(props.workbook.sheetKey, state);
@@ -116,9 +115,6 @@ export function Sheet(props: SheetProps) {
 				onRowResize={props.onRowResize}
 				onSort={props.onSort}
 				onSortChange={props.onSortChange}
-				onRowInsert={props.onRowInsert}
-				onRowDelete={props.onRowDelete}
-				onRowReorder={props.onRowReorder}
 				onCellPointerDown={(address, event) => {
 					const handledByWorkbook = props.workbook
 						? requireWorkbookInternals().handleCellPointerDown(props.workbook.sheetKey, address, event)

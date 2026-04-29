@@ -69,8 +69,12 @@ export default function CrossSheetDemo() {
           data={sheets.data}
           columns={dataColumns}
           workbook={dataWorkbook}
-          onCellEdit={(m) => applyMutation("data", m)}
-          onBatchEdit={(ms) => ms.forEach((m) => applyMutation("data", m))}
+          onOperation={(op) => {
+            switch (op.type) {
+              case "cell-edit": return applyMutation("data", op.mutation);
+              case "batch-edit": op.mutations.forEach((m) => applyMutation("data", m)); return;
+            }
+          }}
         />
       </div>
       <div style={{ overflow: "hidden" }}>
@@ -78,8 +82,12 @@ export default function CrossSheetDemo() {
           data={sheets.summary}
           columns={summaryColumns}
           workbook={summaryWorkbook}
-          onCellEdit={(m) => applyMutation("summary", m)}
-          onBatchEdit={(ms) => ms.forEach((m) => applyMutation("summary", m))}
+          onOperation={(op) => {
+            switch (op.type) {
+              case "cell-edit": return applyMutation("summary", op.mutation);
+              case "batch-edit": op.mutations.forEach((m) => applyMutation("summary", m)); return;
+            }
+          }}
         />
       </div>
     </div>

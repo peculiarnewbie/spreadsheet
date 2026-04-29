@@ -246,6 +246,12 @@ export function shiftFormulaReferencesForRowDelete(
 	);
 }
 
+export function parseA1Address(ref: string): { row: number; col: number } | null {
+	const parsed = parseA1Reference(ref);
+	if (!parsed) return null;
+	return { row: parsed.rowIndex, col: parsed.colIndex };
+}
+
 function parseA1Reference(reference: string): ParsedA1Reference | null {
 	const match = reference.match(/^(\$?)([A-Z]{1,3})(\$?)(\d+)$/i);
 	if (!match) return null;

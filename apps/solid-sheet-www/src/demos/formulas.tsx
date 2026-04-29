@@ -37,11 +37,7 @@ export default function FormulasSheet(props: FormulasSheetProps = {}) {
           formulaEngine={{ instance: hf, sheetId, sheetName }}
           showFormulaBar
           showReferenceHeaders
-          onCellEdit={bindings.onCellEdit}
-          onBatchEdit={bindings.onBatchEdit}
-          onRowInsert={bindings.onRowInsert}
-          onRowDelete={bindings.onRowDelete}
-          onRowReorder={bindings.onRowReorder}
+          onOperation={bindings.onOperation}
           ref={ref}
         />
       )}

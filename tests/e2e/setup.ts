@@ -32,7 +32,14 @@ let _initPromise: Promise<Stagehand> | null = null;
 export async function getStagehand(): Promise<Stagehand> {
 	if (!_initPromise) {
 		_initPromise = (async () => {
-			_stagehand = new Stagehand({ env: "LOCAL" });
+			const headless = process.env.E2E_HEADLESS !== "false";
+		_stagehand = new Stagehand({
+			env: "LOCAL",
+			localBrowserLaunchOptions: {
+				headless,
+				args: headless ? ["--disable-gpu"] : ["--disable-gpu", "--disable-gpu-sandbox"],
+			},
+		});
 			await _stagehand.init();
 			_page = _stagehand.context.activePage() as E2EPage | null;
 			if (!_page) throw new Error("No active page after Stagehand init");

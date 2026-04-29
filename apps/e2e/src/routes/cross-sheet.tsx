@@ -8,6 +8,7 @@ import {
 	type CellValue,
 	type ColumnDef,
 	type SheetController,
+	type SheetOperation,
 } from "peculiar-sheets";
 import "peculiar-sheets/styles";
 
@@ -77,17 +78,17 @@ export default function CrossSheetPage() {
 		});
 	}
 
-	function handleCellEdit(sheetKey: string) {
-		return (mutation: CellMutation) => {
-			applyMutation(sheetKey, mutation);
-			syncWindowState();
-		};
-	}
-
-	function handleBatchEdit(sheetKey: string) {
-		return (mutations: CellMutation[]) => {
-			for (const mutation of mutations) {
-				applyMutation(sheetKey, mutation);
+	function handleOperation(sheetKey: string) {
+		return (op: SheetOperation) => {
+			switch (op.type) {
+				case "cell-edit":
+					applyMutation(sheetKey, op.mutation);
+					break;
+				case "batch-edit":
+					for (const mutation of op.mutations) {
+						applyMutation(sheetKey, mutation);
+					}
+					break;
 			}
 			syncWindowState();
 		};
@@ -130,8 +131,7 @@ export default function CrossSheetPage() {
 					data={sheetState.data}
 					columns={dataColumns}
 					workbook={dataWorkbook}
-					onCellEdit={handleCellEdit("data")}
-					onBatchEdit={handleBatchEdit("data")}
+					onOperation={handleOperation("data")}
 					ref={handleController("data")}
 					sortBehavior="mutation"
 				/>
@@ -141,8 +141,7 @@ export default function CrossSheetPage() {
 					data={sheetState.summary}
 					columns={summaryColumns}
 					workbook={summaryWorkbook}
-					onCellEdit={handleCellEdit("summary")}
-					onBatchEdit={handleBatchEdit("summary")}
+					onOperation={handleOperation("summary")}
 					ref={handleController("summary")}
 				/>
 			</div>
