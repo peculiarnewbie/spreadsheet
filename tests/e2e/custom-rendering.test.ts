@@ -48,6 +48,13 @@ describe("custom rendering hooks", () => {
 		await logMemory("custom-rendering");
 		await closePage();
 	});
+
+	async function getEditorValue(): Promise<string | null> {
+		return getPage().evaluate(() => {
+			const input = document.querySelector(".se-cell-editor");
+			if (!(input instanceof HTMLInputElement)) return null;
+			return input.value;
+		});
 	}
 
 	async function getCellTitle(row: number, col: number): Promise<string | null> {
@@ -80,11 +87,6 @@ describe("custom rendering hooks", () => {
 			{ r: row, c: col },
 		);
 	}
-
-	beforeAll(async () => {
-		sh = await getStagehand();
-		await navigateTo(sh, "/custom-rendering");
-	});
 
 	beforeEach(async () => {
 		await clearMutations(sh);

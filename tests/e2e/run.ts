@@ -13,6 +13,24 @@ const BASE_URL = `http://localhost:${PORT}`;
 const POLL_INTERVAL = 200;
 const STARTUP_TIMEOUT = 30_000;
 
+function runCommand(command: string, args: string[]): Promise<void> {
+	const proc = spawn(command, args, {
+		stdio: "inherit",
+		cwd: process.cwd(),
+	});
+
+	return new Promise<void>((resolve, reject) => {
+		proc.on("error", reject);
+		proc.on("close", (code) => {
+			if (code === 0) {
+				resolve();
+				return;
+			}
+			reject(new Error(`${command} ${args.join(" ")} failed with exit code ${code ?? 1}`));
+		});
+	});
+}
+
 async function waitForServer(url: string): Promise<void> {
 	const start = Date.now();
 	while (Date.now() - start < STARTUP_TIMEOUT) {
@@ -61,6 +79,9 @@ function runTests(): Promise<number> {
 let server: ChildProcess | null = null;
 
 try {
+	console.log("Building peculiar-sheets for e2e…");
+	await runCommand("pnpm", ["build:lib"]);
+
 	console.log("Starting e2e dev server…");
 	server = startDevServer();
 

@@ -7,7 +7,7 @@
     "typecheck": "pnpm -r typecheck",
     "typecheck:lib": "pnpm --filter peculiar-sheets typecheck",
     "build:www": "pnpm --filter solid-sheet-www build",
-    "publish:lib": "pnpm --filter peculiar-sheets run publish:npm",
+    "publish": "pnpm run build:lib && pnpm --filter peculiar-sheets run publish:npm",
     "e2e": "bun run tests/e2e/run.ts",
     "e2e:dev": "pnpm --filter @peculiarnewbie/e2e dev"
   },

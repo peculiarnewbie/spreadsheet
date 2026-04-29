@@ -77,6 +77,11 @@ export default function Harness(props: HarnessProps) {
 		window.__SHEET_CONTROLLER__ = ctrl;
 	}
 
+	function handleOperation(operation: Parameters<typeof bindings.onOperation>[0]) {
+		bindings.onOperation(operation);
+		syncWindowState();
+	}
+
 	// ── Render ────────────────────────────────────────────────────────────
 
 	return (
@@ -89,7 +94,7 @@ export default function Harness(props: HarnessProps) {
 				showFormulaBar={props.showFormulaBar}
 				showReferenceHeaders={props.showReferenceHeaders}
 				customization={props.customization}
-				onOperation={bindings.onOperation}
+				onOperation={handleOperation}
 				onSort={props.onSort}
 				onSortChange={setSortState}
 				ref={handleRef}
